@@ -7,18 +7,22 @@
   --color-muted: #181b20;
   --color-muted-foreground: #939aa6;
   --color-border: #272b33;
-  --color-primary: #2f6bff;
+  /* #2a63f0: blanco encima da 5,1:1 (AA). Hover más oscuro, nunca más claro. */
+  --color-primary: #2a63f0;
+  --color-primary-hover: #2358e0;
   --color-primary-glow: #86a8ff;
+  --color-whatsapp: #0e7a3c;
+  --color-whatsapp-hover: #0b6b34;
   --color-paper: #e8eaee;
   --color-ink: #0a0b0d;
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Bricolage Grotesque", "Manrope", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-tag: "Permanent Marker", cursive;
   --spacing-13: 3.25rem;
-  --shadow-glow-sm: 0 14px 34px -22px rgb(47 107 255 / 0.55);
-  --shadow-glow: 0 22px 50px -20px rgb(47 107 255 / 0.75);
-  --shadow-glow-lg: 0 40px 100px -30px rgb(47 107 255 / 0.85);
+  /* Dos niveles de sombra, neutras. El azul queda para acciones y el logo. */
+  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 28px -16px rgb(0 0 0 / 0.6);
+  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.3), 0 36px 80px -32px rgb(0 0 0 / 0.85);
+  /* Esquinas: 8px (lg) controles pequeños, 16px (2xl) tarjetas y paneles, y píldoras. */
 }
 
 .font-display,
@@ -30,10 +34,10 @@
   letter-spacing: -0.015em;
 }
 .label {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -91,10 +95,15 @@ body {
 .btn-primary {
   background: var(--color-primary);
   color: #fff;
-  box-shadow: 0 16px 36px -16px rgb(47 107 255 / 0.9);
 }
 .btn-primary:hover {
-  background: var(--color-primary-glow);
+  background: var(--color-primary-hover);
+}
+.btn-whatsapp {
+  background: var(--color-whatsapp);
+}
+.btn-whatsapp:hover {
+  background: var(--color-whatsapp-hover);
 }
 .btn-ghost {
   border: 1px solid var(--color-border);
@@ -111,7 +120,7 @@ body {
 .sticker {
   z-index: 2;
   padding: 0.45rem 0.9rem;
-  border-radius: 0.6rem;
+  border-radius: 0.5rem;
   font-family: var(--font-tag);
   font-size: clamp(0.9rem, 2.4vw, 1.15rem);
   white-space: nowrap;
@@ -200,36 +209,16 @@ body {
   }
 }
 .vs-look .rwl-cap {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
 }
 .vs-look .rwl-stage {
   background:
-    radial-gradient(ellipse 55% 26% at 66% 96%, rgb(47 107 255 / 0.28), transparent 70%),
     repeating-linear-gradient(90deg, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 88px),
     repeating-linear-gradient(0deg, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 88px),
     linear-gradient(180deg, #0c0d10, #14171c 70%, #0c0d10);
 }
-.vs-look .rwl-stage::after {
-  content: "VIPER STORE  ///  DROP 01  ///  GOOD VIBES ONLY  ///  VIPER STORE  ///  DROP 01  ///  GOOD VIBES ONLY  ///  VIPER STORE  ///  DROP 01  ///";
-  position: absolute;
-  left: -5%;
-  right: -5%;
-  top: 57%;
-  padding: 7px 0;
-  transform: rotate(-4deg);
-  background: var(--color-primary);
-  color: #fff;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  white-space: nowrap;
-  overflow: hidden;
-  opacity: 0.45;
-  pointer-events: none;
-}
 .vs-look .rwl-fig > img {
-  border-radius: 10px;
+  border-radius: 8px;
   filter: grayscale(1) contrast(1.1) brightness(0.8);
   transition: filter 0.6s ease;
   box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.85), 0 0 0 1px rgb(255 255 255 / 0.08);
@@ -238,8 +227,8 @@ body {
   filter: none;
   box-shadow: 0 40px 80px -24px rgb(0 0 0 / 0.9), 0 0 0 2px #fff;
 }
-.vs-look .rwl-fig > i {
-  background: radial-gradient(closest-side, rgb(47 107 255 / 0.55), transparent);
+.vs-look .rwl-blurb {
+  font-size: 13px;
 }
 .vs-look .rwl-rail {
   background: var(--color-surface);
@@ -253,7 +242,7 @@ body {
   border-radius: 8px;
 }
 .vs-look .rwl-pname {
-  font-size: 10px;
+  font-size: 12px;
 }
 .vs-look .rwl-price {
   font-size: 12px;
@@ -266,10 +255,10 @@ body {
   line-height: 0.9;
 }
 .vs-look .rwl-look {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.12em;
   color: var(--color-primary-glow);
   align-items: center;
 }
@@ -288,24 +277,27 @@ body {
   text-shadow: 0 2px 24px rgb(0 0 0 / 0.8);
 }
 .look-price {
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
   font-size: 15px;
   color: var(--color-foreground);
 }
 .vs-look .rwl-shop {
   margin-top: 16px;
+  min-height: 44px;
   padding: 14px 22px;
   border: 0;
   border-radius: 999px;
   background: var(--color-primary);
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   transition: background-color 0.2s ease, transform 0.15s ease;
 }
 .vs-look .rwl-shop:hover {
-  background: var(--color-primary-glow);
+  background: var(--color-primary-hover);
 }
 .vs-look .rwl-shop:active {
   transform: scale(0.97);
@@ -324,7 +316,7 @@ body {
   width: 100%;
   height: 3.25rem;
   padding: 0 1rem;
-  border-radius: 0.9rem;
+  border-radius: 1rem;
   border: 1.5px solid var(--color-border);
   background: var(--color-background);
   color: var(--color-foreground);
@@ -361,18 +353,15 @@ button {
 }
 
 /* Lookbook en celular: foto arriba, nombre y botón abajo, sin encimarse */
-.vs-look[data-narrow] .rwl-stage::after {
-  display: none;
-}
 .vs-look[data-narrow] .rwl-copy {
   top: 12px;
   max-width: none;
 }
 .vs-look[data-narrow] .rwl-title {
-  font-family: var(--font-mono);
-  font-size: 11px;
+  font-family: var(--font-sans);
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.1em;
   color: var(--color-muted-foreground);
   margin: 0;
 }
@@ -404,15 +393,8 @@ button {
   font-size: 12px;
 }
 
-/* Sombras azules en paneles */
 [role="dialog"] {
-  box-shadow: 0 0 120px -20px rgb(47 107 255 / 0.45);
-}
-.sticker.bg-primary {
-  box-shadow: 0 14px 34px -10px rgb(47 107 255 / 0.8);
-}
-.vs-look .rwl-fig[data-front] > img {
-  box-shadow: 0 40px 90px -24px rgb(47 107 255 / 0.7), 0 0 0 2px #fff;
+  box-shadow: var(--shadow-lift);
 }
 @media (min-width: 640px) {
   .vs-look[data-narrow] .rwl-foot {

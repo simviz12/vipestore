@@ -31,7 +31,7 @@ export function Logo({ className, size = "md" }: { className?: string; size?: "m
       <Diamond className={cn("shrink-0 drop-shadow-[0_0_14px_rgb(47_107_255/0.75)]", lg ? "h-12 w-auto" : "h-9 w-auto sm:h-10")} />
       <span className="flex flex-col leading-none">
         <span className={cn("font-display uppercase tracking-wide", lg ? "text-4xl" : "text-2xl sm:text-[1.7rem]")}>Viper</span>
-        <span className={cn("font-mono font-bold uppercase text-primary-glow", lg ? "mt-1 text-[11px] tracking-[0.56em]" : "mt-0.5 text-[8px] tracking-[0.5em] sm:text-[9px]")}>Store</span>
+        <span className={cn("font-sans font-extrabold uppercase text-primary-glow", lg ? "mt-1 text-[11px] tracking-[0.56em]" : "mt-0.5 text-[8px] tracking-[0.5em] sm:text-[9px]")}>Store</span>
       </span>
     </span>
   )

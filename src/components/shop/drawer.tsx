@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react"
 import { X } from "lucide-react"
+import { useFocusTrap } from "@/hooks/use-focus-trap"
 import { cn } from "@/lib/utils"
 
 /** Panel lateral en computador, hoja inferior en celular. */
@@ -17,12 +18,12 @@ export function Drawer({
   footer?: React.ReactNode
 }) {
   const panel = useRef<HTMLDivElement>(null)
+  useFocusTrap(panel, open)
 
   useEffect(() => {
     if (!open) return
     const prev = document.documentElement.style.overflow
     document.documentElement.style.overflow = "hidden"
-    panel.current?.focus()
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
     window.addEventListener("keydown", onKey)
     return () => {
@@ -41,14 +42,14 @@ export function Drawer({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "absolute inset-x-0 bottom-0 flex max-h-[94dvh] flex-col rounded-t-3xl border-t border-border bg-surface outline-none transition-transform duration-300 ease-[cubic-bezier(.2,.8,.2,1)]",
+          "absolute inset-x-0 bottom-0 flex max-h-[94dvh] flex-col rounded-t-2xl border-t border-border bg-surface outline-none transition-transform duration-300 ease-[cubic-bezier(.2,.8,.2,1)]",
           "sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[480px] sm:rounded-none sm:border-l sm:border-t-0",
           open ? "translate-y-0 sm:translate-x-0" : "translate-y-full sm:translate-x-full sm:translate-y-0",
         )}
       >
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-5 py-4">
           <h2 className="font-display text-2xl uppercase leading-none">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Cerrar" className="grid size-10 place-items-center rounded-full border border-border transition-colors hover:border-foreground/50">
+          <button type="button" onClick={onClose} aria-label="Cerrar" className="grid size-11 shrink-0 place-items-center rounded-full border border-border transition-colors hover:border-foreground/50">
             <X className="size-5" />
           </button>
         </div>

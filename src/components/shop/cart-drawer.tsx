@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { cloneElement, useEffect, useState } from "react"
 import { ArrowLeft, Banknote, Check, MessageCircle, Minus, Plus, ShoppingBag, Smartphone, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { buildWhatsAppUrl, cartCount, cartTotal, clearCart, customerStore, formatCOP, removeItem, setQty, useCart, type Customer, type Payment } from "@/lib/store"
@@ -39,8 +39,12 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     if (form.address.trim().length < 5) err.address = "Escribe la dirección exacta."
     if (!form.payment) err.payment = "Elige cómo vas a pagar."
     setErrors(err)
-    if (Object.keys(err).length) {
-      document.getElementById("f-" + Object.keys(err)[0])?.scrollIntoView({ block: "center", behavior: "smooth" })
+    const first = Object.keys(err)[0]
+    if (first) {
+      // Lleva el foco (no solo el scroll) al primer campo con error.
+      const el = first === "payment" ? document.querySelector<HTMLElement>("#f-payment button") : document.getElementById("f-" + first)
+      el?.focus({ preventScroll: true })
+      el?.scrollIntoView({ block: "center", behavior: "smooth" })
       return
     }
     customerStore.set(form)
@@ -56,8 +60,8 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
     step === "cart" && items.length > 0 ? (
       <div>
         <div className="mb-3 flex items-baseline justify-between">
-          <span className="text-sm text-muted-foreground">Total</span>
-          <span className="font-display text-3xl">{formatCOP(total)}</span>
+          <span className="text-sm text-muted-foreground">Total productos</span>
+          <span className="font-display text-3xl tabular-nums">{formatCOP(total)}</span>
         </div>
         <button type="button" onClick={() => setStep("checkout")} className="btn-primary w-full">
           Finalizar compra
@@ -66,11 +70,12 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       </div>
     ) : step === "checkout" ? (
       <div>
-        <div className="mb-3 flex items-baseline justify-between">
-          <span className="text-sm text-muted-foreground">Total a pagar</span>
-          <span className="font-display text-3xl">{formatCOP(total)}</span>
+        <div className="flex items-baseline justify-between">
+          <span className="text-sm text-muted-foreground">Total productos</span>
+          <span className="font-display text-3xl tabular-nums">{formatCOP(total)}</span>
         </div>
-        <button type="submit" form="checkout" className="btn-primary w-full bg-[#1fa855] hover:bg-[#25c463]">
+        <p className="mb-3 mt-1 text-xs text-muted-foreground">El costo del envío te lo confirmamos por WhatsApp antes de pagar.</p>
+        <button type="submit" form="checkout" className="btn-primary btn-whatsapp w-full">
           <MessageCircle className="size-5" /> Confirmar pedido por WhatsApp
         </button>
       </div>
@@ -87,7 +92,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             return (
               <li key={s} className={cn("flex items-center gap-2", active ? "text-foreground" : "text-muted-foreground")}>
                 {i > 0 && <span className="h-px w-5 bg-border" />}
-                <span className={cn("grid size-5 place-items-center rounded-full text-[10px]", active || done ? "bg-primary text-white" : "bg-muted")}>
+                <span className={cn("grid size-6 place-items-center rounded-full text-xs", active || done ? "bg-primary text-white" : "bg-muted")}>
                   {done ? <Check className="size-3" strokeWidth={3} /> : i + 1}
                 </span>
                 {s}
@@ -114,11 +119,11 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           <ul className="divide-y divide-border">
             {items.map((i) => (
               <li key={i.key} className="flex gap-4 p-5">
-                <img src={i.image} alt="" className="h-28 w-22 shrink-0 rounded-xl bg-muted object-cover" />
+                <img src={i.image} alt="" className="h-28 w-22 shrink-0 rounded-lg bg-muted object-cover" />
                 <div className="flex min-w-0 flex-1 flex-col">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-semibold leading-tight">{i.name}</h3>
-                    <button type="button" onClick={() => { removeItem(i.key); toast(`Quitaste ${i.name}`) }} aria-label={`Eliminar ${i.name}`} className="-mr-2 -mt-2 grid size-10 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:text-red-400">
+                    <button type="button" onClick={() => { removeItem(i.key); toast(`Quitaste ${i.name}`) }} aria-label={`Eliminar ${i.name}`} className="-mr-2 -mt-2 grid size-11 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors hover:text-red-400">
                       <Trash2 className="size-4" />
                     </button>
                   </div>
@@ -127,16 +132,16 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                   </p>
                   <p className="text-sm text-muted-foreground">{formatCOP(i.price)} c/u</p>
                   <div className="mt-auto flex items-center justify-between pt-2">
-                    <div className="flex h-10 items-center rounded-full border border-border">
-                      <button type="button" onClick={() => setQty(i.key, i.qty - 1)} aria-label="Restar" className="grid h-full w-10 place-items-center">
+                    <div className="flex h-11 items-center rounded-full border border-border">
+                      <button type="button" onClick={() => setQty(i.key, i.qty - 1)} aria-label={`Quitar una unidad de ${i.name}`} className="grid h-full w-11 place-items-center">
                         <Minus className="size-3.5" />
                       </button>
                       <span className="w-6 text-center text-sm font-semibold tabular-nums">{i.qty}</span>
-                      <button type="button" onClick={() => setQty(i.key, Math.min(10, i.qty + 1))} aria-label="Sumar" className="grid h-full w-10 place-items-center">
+                      <button type="button" onClick={() => setQty(i.key, Math.min(10, i.qty + 1))} aria-label={`Agregar una unidad de ${i.name}`} className="grid h-full w-11 place-items-center">
                         <Plus className="size-3.5" />
                       </button>
                     </div>
-                    <span className="font-display text-xl">{formatCOP(i.price * i.qty)}</span>
+                    <span className="font-display text-xl tabular-nums">{formatCOP(i.price * i.qty)}</span>
                   </div>
                 </div>
               </li>
@@ -169,7 +174,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
             <input id="f-notes" className="input" value={form.notes} onChange={(e) => field("notes", e.target.value)} placeholder="Ej: portería, casa de rejas negras" />
           </Field>
 
-          <fieldset id="f-payment">
+          <fieldset id="f-payment" aria-describedby={errors.payment ? "e-payment" : undefined}>
             <legend className="mb-2 text-sm font-semibold">Método de pago</legend>
             <div className="grid gap-2">
               {PAYMENTS.map((m) => {
@@ -194,10 +199,10 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
                 )
               })}
             </div>
-            {errors.payment && <p role="alert" className="mt-2 text-sm text-red-400">{errors.payment}</p>}
+            {errors.payment && <p id="e-payment" role="alert" className="mt-2 text-sm text-red-400">{errors.payment}</p>}
           </fieldset>
 
-          <p className="rounded-xl bg-muted p-3 text-sm text-muted-foreground">
+          <p className="rounded-lg bg-muted p-3 text-sm text-muted-foreground">
             Al confirmar se abre WhatsApp con tu pedido ya escrito. Solo tienes que tocar <strong className="text-foreground">Enviar</strong>.
           </p>
         </form>
@@ -206,7 +211,7 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
       {/* ── Enviado ── */}
       {step === "sent" && (
         <div className="flex flex-col items-center px-6 py-16 text-center">
-          <span className="grid size-16 place-items-center rounded-full bg-[#1fa855] text-white">
+          <span className="grid size-16 place-items-center rounded-full bg-whatsapp text-white">
             <MessageCircle className="size-8" />
           </span>
           <p className="mt-5 font-display text-3xl uppercase">Envía el mensaje</p>
@@ -237,14 +242,16 @@ export function CartDrawer({ open, onClose }: { open: boolean; onClose: () => vo
   )
 }
 
-function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactNode }) {
+function Field({ id, label, error, children }: { id: string; label: string; error?: string; children: React.ReactElement<React.InputHTMLAttributes<HTMLInputElement>> }) {
+  // El campo anuncia su error a lectores de pantalla (aria-invalid + aria-describedby).
+  const input = cloneElement(children, { "aria-invalid": error ? true : undefined, "aria-describedby": error ? "e-" + id : undefined })
   return (
     <div>
       <label htmlFor={"f-" + id} className="mb-1.5 block text-sm font-semibold">
         {label}
       </label>
-      <div className={error ? "[&_.input]:border-red-400" : ""}>{children}</div>
-      {error && <p role="alert" className="mt-1.5 text-sm text-red-400">{error}</p>}
+      <div className={error ? "[&_.input]:border-red-400" : ""}>{input}</div>
+      {error && <p id={"e-" + id} role="alert" className="mt-1.5 text-sm text-red-400">{error}</p>}
     </div>
   )
 }

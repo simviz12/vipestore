@@ -68,7 +68,7 @@ function Panel({ product: p, open, onClose, onOpenCart }: { product: Product; op
       footer={
         <div>
           {missing && (
-            <p role="alert" className="mb-3 rounded-xl bg-primary/15 px-4 py-2.5 text-sm text-primary-glow">
+            <p role="alert" className="mb-3 rounded-lg bg-primary/15 px-4 py-2.5 text-sm text-primary-glow">
               {missing === "ambos" ? "Te falta elegir el color y la talla." : missing === "color" ? "Te falta elegir el color." : "Te falta elegir la talla."} Tócalos arriba 👆
             </p>
           )}
@@ -112,7 +112,7 @@ function Panel({ product: p, open, onClose, onOpenCart }: { product: Product; op
               type="button"
               onClick={() => setImgIdx(i)}
               aria-label={`Foto ${i + 1}`}
-              className={cn("size-16 shrink-0 overflow-hidden rounded-xl ring-2 ring-offset-2 ring-offset-surface transition", i === imgIdx ? "ring-primary" : "ring-transparent opacity-60")}
+              className={cn("size-16 shrink-0 overflow-hidden rounded-lg ring-2 ring-offset-2 ring-offset-surface transition", i === imgIdx ? "ring-primary" : "ring-transparent opacity-60")}
             >
               <img src={src} alt="" className="size-full object-cover" />
             </button>
@@ -176,7 +176,7 @@ function Panel({ product: p, open, onClose, onOpenCart }: { product: Product; op
                   onClick={() => pickSize(s.label)}
                   aria-pressed={on}
                   className={cn(
-                    "relative grid h-12 min-w-14 place-items-center rounded-xl border-2 px-3 text-sm font-semibold transition",
+                    "relative grid h-12 min-w-14 place-items-center rounded-lg border-2 px-3 text-sm font-semibold transition",
                     on ? "border-primary bg-primary text-white" : "border-border hover:border-foreground/40",
                     s.soldOut && "cursor-not-allowed opacity-40 line-through",
                   )}

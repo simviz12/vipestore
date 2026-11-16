@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Menu, Search, ShoppingBag, X } from "lucide-react"
+import { useFocusTrap } from "@/hooks/use-focus-trap"
 import { cn } from "@/lib/utils"
 import { Logo } from "./logo"
 
@@ -13,6 +14,9 @@ const links = [
 export function Header({ cart, onCart, onSearch }: { cart: number; onCart: () => void; onSearch: () => void }) {
   const [open, setOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const menu = useRef<HTMLDivElement>(null)
+  const closeBtn = useRef<HTMLButtonElement>(null)
+  useFocusTrap(menu, open, closeBtn)
 
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 24)
@@ -64,7 +68,7 @@ export function Header({ cart, onCart, onSearch }: { cart: number; onCart: () =>
             <button
               type="button"
               onClick={onCart}
-              className="relative flex h-11 items-center gap-2 rounded-full bg-foreground px-4 shadow-glow text-sm font-semibold text-background transition-transform active:scale-[0.96]"
+              className="relative flex h-11 items-center gap-2 rounded-full bg-foreground px-4 text-sm font-semibold text-background transition-transform active:scale-[0.96]"
               aria-label={`Abrir bolsa, ${cart} productos`}
             >
               <ShoppingBag className="size-4" />
@@ -94,6 +98,7 @@ export function Header({ cart, onCart, onSearch }: { cart: number; onCart: () =>
 
       {/* Menú móvil */}
       <div
+        ref={menu}
         className={cn(
           "fixed inset-0 z-[60] flex flex-col bg-background transition-[opacity,visibility] duration-300 lg:hidden",
           open ? "visible opacity-100" : "invisible opacity-0",
@@ -104,7 +109,7 @@ export function Header({ cart, onCart, onSearch }: { cart: number; onCart: () =>
       >
         <div className="flex h-16 items-center justify-between px-4">
           <Logo />
-          <button type="button" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-full border border-border" aria-label="Cerrar menú">
+          <button ref={closeBtn} type="button" onClick={() => setOpen(false)} className="grid size-11 place-items-center rounded-full border border-border" aria-label="Cerrar menú">
             <X className="size-5" />
           </button>
         </div>
@@ -115,13 +120,12 @@ export function Header({ cart, onCart, onSearch }: { cart: number; onCart: () =>
               href={l.href}
               onClick={() => setOpen(false)}
               className={cn(
-                "flex items-baseline justify-between border-b border-border py-4 font-display text-4xl uppercase transition-[opacity,transform] duration-500",
+                "border-b border-border py-4 font-display text-4xl uppercase transition-[opacity,transform] duration-500",
                 open ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
               )}
               style={{ transitionDelay: open ? `${80 + i * 50}ms` : "0ms" }}
             >
               {l.label}
-              <span className="font-sans text-xs text-muted-foreground">0{i + 1}</span>
             </a>
           ))}
         </nav>
