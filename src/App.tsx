@@ -41,6 +41,8 @@ const CATEGORY_TILES: { num: string; label: string; cat: Category; img: string; 
 
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
 
+const LOOKBOOK_BG = "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=900&h=1100&fit=crop&q=80"
+
 export default function App() {
   const catalog = useCatalog()
   const cart = useCart()
@@ -52,6 +54,7 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [stage, setStage] = useState<CheckoutStage>("off")
   const [infoModal, setInfoModal] = useState<InfoModalType>(null)
+  const [activeHotspot, setActiveHotspot] = useState<number>(0)
 
   // Animación carrito volador, rebote y toast
   const [flyers, setFlyers] = useState<Flyer[]>([])
@@ -166,6 +169,44 @@ export default function App() {
     document.getElementById("tienda")?.scrollIntoView({ behavior: "smooth" })
   }
 
+  // Prendas para el lookbook interactivo "Arma tu outfit"
+  const outfitPieces = useMemo(() => {
+    const hoodie = catalog.find((p) => inferCategory(p) === "Hoodies" && !isSoldOut(p)) ?? catalog[0]
+    const cargo = catalog.find((p) => inferCategory(p) === "Cargos" && !isSoldOut(p)) ?? catalog[1] ?? catalog[0]
+    const acc = catalog.find((p) => inferCategory(p) === "Accesorios" && !isSoldOut(p)) ?? catalog[2] ?? catalog[0]
+    return [
+      { product: hoodie, left: "44%", top: "24%", label: "Parte superior" },
+      { product: cargo, left: "56%", top: "52%", label: "Pantalón" },
+      { product: acc, left: "34%", top: "64%", label: "Accesorio" },
+    ].filter((x) => Boolean(x.product))
+  }, [catalog])
+
+  const handleExploreLooks = () => {
+    if (outfitPieces[activeHotspot]?.product) {
+      setSelectedProduct(outfitPieces[activeHotspot].product)
+    } else {
+      document.getElementById("tienda")?.scrollIntoView({ behavior: "smooth" })
+    }
+  }
+
+  const handleAddFullOutfit = () => {
+    outfitPieces.forEach(({ product }) => {
+      if (!product || isSoldOut(product)) return
+      const c = product.colors.find((x) => !x.soldOut) ?? product.colors[0]
+      const s =
+        product.sizes.find((x) => !x.soldOut && x.label === "M")?.label ??
+        product.sizes.find((x) => !x.soldOut)?.label ??
+        "M"
+      addToCart(product, c, s, 1)
+    })
+    setBump((b) => b + 1)
+    const id = ++seqRef.current
+    setToast({ id, text: `Look completo (${outfitPieces.length} prendas) agregado` })
+    schedule(() => {
+      setToast((prev) => (prev && prev.id === id ? null : prev))
+    }, 3400)
+  }
+
   const bumpClass = bump === 0 ? "" : bump % 2 ? "vs-bump-a" : "vs-bump-b"
   const showMobileBar = count > 0 && stage === "off" && !selectedProduct && !infoModal
   const waDirect = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hola Viper Store, quiero más información sobre las prendas disponibles.")}`
@@ -222,6 +263,9 @@ export default function App() {
             >
               Accesorios
             </button>
+            <a href="#outfit" className="whitespace-nowrap text-[#E8EAED] transition-colors hover:text-[#2E8BFF]">
+              Arma tu outfit
+            </a>
           </nav>
 
           <div className="flex shrink-0 items-center gap-2.5">
@@ -574,6 +618,112 @@ export default function App() {
             })}
           </div>
         )}
+      </section>
+
+      {/* ───────── ARMA TU OUTFIT (EL LOOK COMPLETO, EN UN CLIC) ───────── */}
+      <section id="outfit" className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
+        <div className="grid grid-cols-1 overflow-hidden border border-[#2A313B] bg-[#1A1E24] lg:grid-cols-2">
+          <div className="flex flex-col justify-center gap-5 p-7 sm:p-12 lg:p-14">
+            <div className="font-mono text-[13px] tracking-[0.2em] text-[#8A94A3]">
+              ARMA TU OUTFIT
+            </div>
+
+            <h2 className="m-0 font-display text-[44px] font-normal uppercase leading-[1.0] text-[#F2F4F7] sm:text-[56px]">
+              EL LOOK COMPLETO,
+              <br />
+              EN UN CLIC.
+            </h2>
+
+            <p className="m-0 max-w-[440px] text-[15px] leading-[1.55] text-[#B8BFCA] sm:text-[17px]">
+              Cada foto del lookbook tiene puntos sobre las prendas. Toca, elige talla y agrega todo el outfit junto.
+            </p>
+
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={handleExploreLooks}
+                className="vs-press inline-flex h-[52px] items-center justify-center border-0 bg-[#E8EAED] px-7 text-[15px] font-bold text-[#0B0D10] transition-colors hover:bg-white"
+              >
+                Explorar looks
+              </button>
+              <button
+                type="button"
+                onClick={handleAddFullOutfit}
+                className="vs-press inline-flex h-[52px] items-center justify-center border border-[#3A424E] bg-transparent px-6 text-[14px] font-semibold text-[#F2F4F7] transition-colors hover:border-[#2E8BFF] hover:text-[#2E8BFF]"
+              >
+                + Agregar todo el outfit
+              </button>
+            </div>
+          </div>
+
+          <div className="relative min-h-[420px] overflow-hidden bg-[#2A313B] sm:min-h-[480px] lg:min-h-[520px]">
+            <img
+              src={LOOKBOOK_BG}
+              alt="Lookbook Viper Store"
+              loading="lazy"
+              className="absolute inset-0 h-full w-full object-cover object-top"
+            />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B0D10]/85 via-transparent to-[#0B0D10]/20" />
+            <span className="absolute top-5 left-5 bg-[#0B0D10]/85 px-3 py-1.5 font-mono text-[11px] tracking-[0.15em] text-[#C3CAD4]">
+              LOOK 01 · COLECCIÓN
+            </span>
+
+            {/* 3 Hotspots interactivos */}
+            {outfitPieces.map((spot, idx) => {
+              const active = activeHotspot === idx
+              return (
+                <button
+                  key={spot.product.id + idx}
+                  type="button"
+                  aria-label={`Ver ${spot.product.name}`}
+                  onClick={() => setActiveHotspot(idx)}
+                  className="vs-hotspot absolute -mt-3.5 -ml-3.5 flex h-7 w-7 items-center justify-center rounded-full border-[3px] border-[#0B0D10] p-0 transition-transform"
+                  style={{
+                    left: spot.left,
+                    top: spot.top,
+                    background: active ? "#F2F4F7" : "#2E8BFF",
+                    transform: active ? "scale(1.25)" : "scale(1)",
+                  }}
+                >
+                  <span className="h-2 w-2 rounded-full bg-[#0B0D10]" />
+                </button>
+              )
+            })}
+
+            {/* Tarjeta flotante de la prenda activa */}
+            {outfitPieces[activeHotspot]?.product && (
+              <div className="absolute right-4 bottom-4 left-4 flex items-center justify-between gap-3 border border-[#2A313B] bg-[#0B0D10]/95 p-4 backdrop-blur-sm">
+                <div className="min-w-0">
+                  <div className="font-mono text-[10px] tracking-[0.16em] text-[#2E8BFF]">
+                    {outfitPieces[activeHotspot].label.toUpperCase()}
+                  </div>
+                  <div className="mt-0.5 truncate text-[15px] font-semibold text-[#F2F4F7]">
+                    {outfitPieces[activeHotspot].product.name}
+                  </div>
+                  <div className="mt-0.5 font-mono text-[13px] text-[#C3CAD4]">
+                    {formatCOP(outfitPieces[activeHotspot].product.price)}
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProduct(outfitPieces[activeHotspot].product)}
+                    className="vs-press h-10 border border-[#3A424E] bg-transparent px-3.5 text-[12px] font-semibold text-[#F2F4F7]"
+                  >
+                    Ver detalles
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleQuickAdd(outfitPieces[activeHotspot].product, e)}
+                    className="vs-press h-10 border-0 bg-[#2E8BFF] px-4 text-[12px] font-bold text-[#0B0D10]"
+                  >
+                    + Agregar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </section>
 
       {/* ───────── Footer con marca de agua gigante ───────── */}
