@@ -65,12 +65,13 @@ export function validateCatalog(data: unknown): string | null {
     if (typeof p.price !== "number" || !(p.price > 0) || p.price > 100_000_000) return `Precio inválido en ${label}.`
     if (!isStr(p.description, 1000)) return `Descripción inválida en ${label}.`
     if (p.tag !== undefined && !isStr(p.tag, 40)) return `Etiqueta inválida en ${label}.`
+    if (p.category !== undefined && !isStr(p.category, 40)) return `Categoría inválida en ${label}.`
     if (!Array.isArray(p.sizes) || !p.sizes.length || p.sizes.some((s) => !isStr(s?.label, 10))) return `Tallas inválidas en ${label}.`
     if (!Array.isArray(p.colors) || !p.colors.length) return `${label} necesita al menos un color.`
     for (const c of p.colors as Record<string, unknown>[]) {
       if (!isStr(c?.id, 80) || !isStr(c.name, 60) || !isStr(c.hex, 20)) return `Color inválido en ${label}.`
-      if (!Array.isArray(c.images) || !c.images.length || c.images.length > 12 || !c.images.every(isUrl))
-        return `Las fotos del color “${String(c.name)}” en ${label} deben ser enlaces (1 a 12).`
+      if (!Array.isArray(c.images) || c.images.length > 12 || !c.images.every(isUrl))
+        return `Las fotos del color “${String(c.name)}” en ${label} deben ser enlaces válidos (máximo 12).`
     }
   }
   return null

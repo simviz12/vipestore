@@ -1,429 +1,1108 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { ArrowDown, Check, Instagram, MessageCircle, Search, X } from "lucide-react"
-import RunwayLookbook, { type RunwayLook } from "@/components/ui/runway-lookbook"
-import { Header } from "@/components/site/header"
-import { Logo, LogoBadge } from "@/components/site/logo"
-import { CartDrawer } from "@/components/shop/cart-drawer"
-import { ProductDrawer } from "@/components/shop/product-drawer"
-import { Toaster } from "@/components/shop/toast"
-import { useReveal } from "@/hooks/use-reveal"
-import { INSTAGRAM_URL, WHATSAPP_NUMBER } from "@/config"
+import {
+  FREE_SHIPPING_FROM,
+  INSTAGRAM_URL,
+  TIKTOK_URL,
+  WHATSAPP_DISPLAY,
+  WHATSAPP_NUMBER,
+} from "@/config"
+import { BRAND_FACHADA_IMG, BRAND_LOGO_IMG, CATEGORY_IMAGES } from "@/lib/assets"
 import { syncCatalog } from "@/lib/api"
-import { cartCount, formatCOP, isSoldOut, useCart, useCatalog, type Product } from "@/lib/store"
+import {
+  addToCart,
+  buildDropListWhatsAppUrl,
+  cartCount,
+  CATEGORIES,
+  dropListStore,
+  formatCOP,
+  inferCategory,
+  isSoldOut,
+  useCart,
+  useCatalog,
+  type Category,
+  type ColorVariant,
+  type Product,
+} from "@/lib/store"
+import { Logo } from "@/components/site/logo"
+import { ProductSheet } from "@/components/shop/product-sheet"
+import { CheckoutFlow, type CheckoutStage } from "@/components/shop/checkout-flow"
+import { InfoModal, type InfoModalType } from "@/components/shop/info-modals"
 
-const WA_CHAT = `https://wa.me/${WHATSAPP_NUMBER}`
-const ticker = ["Nuevo drop", "Good vibes only", "Local support local", "Viper Store", "Ropa tan chimba"]
-const QUICK = ["Chaqueta", "Buzo", "Negro", "Azul", "Nuevo"]
-const FIRST = 8
+type FilterOption = "Todo" | Category
+type Flyer = { id: number; x: number; y: number; tx: number; ty: number; go: boolean }
+type ToastState = { id: number; text: string } | null
 
-/** Minúsculas y sin tildes, para que "cafe" encuentre "Café". */
-const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "")
+const FILTER_LABELS: FilterOption[] = ["Todo", ...CATEGORIES]
 
-function Marquee({ className = "" }: { className?: string }) {
-  const row = [...ticker, ...ticker, ...ticker, ...ticker]
-  return (
-    <div className={"overflow-hidden " + className} aria-hidden>
-      <div className="marquee flex w-max">
-        {[0, 1].map((k) => (
-          <div key={k} className="flex shrink-0 items-center">
-            {row.map((t, i) => (
-              <span key={i} className="flex items-center gap-6 pr-6 font-display text-2xl uppercase sm:text-4xl">
-                {t}
-                <span className="opacity-50">///</span>
-              </span>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ProductCard({ p, onOpen }: { p: Product; onOpen: () => void }) {
-  const out = isSoldOut(p)
-  const cover = (p.colors.find((c) => !c.soldOut) ?? p.colors[0])?.images[0]
-  return (
-    <button type="button" onClick={onOpen} className="group flex flex-col text-left" aria-label={`Ver ${p.name}, ${formatCOP(p.price)}`}>
-      <div className="relative overflow-hidden rounded-2xl bg-muted shadow-soft ring-1 ring-border transition duration-300 group-hover:ring-foreground/40">
-        <img
-          src={cover}
-          alt=""
-          loading="lazy"
-          className={"aspect-[4/5] w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03] " + (out ? "opacity-40 grayscale" : "")}
-        />
-        {(out || p.tag) && (
-          <span className={"label absolute left-2.5 top-2.5 rounded-lg px-2 py-1 " + (out ? "bg-red-600 text-white" : "bg-white text-black")}>
-            {out ? "Agotado" : p.tag}
-          </span>
-        )}
-      </div>
-      {/* Nombre a 2 líneas fijas: precio y botón quedan alineados en toda la fila */}
-      <div className="mt-3 flex flex-1 flex-col px-0.5">
-        <h3 className="line-clamp-2 min-h-[2lh] text-[15px] font-semibold leading-tight">{p.name}</h3>
-        <div className="mb-3 mt-1.5 flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold tabular-nums text-primary-glow">{formatCOP(p.price)}</span>
-          <span className="flex items-center gap-1">
-            {p.colors.map((c) => (
-              <span key={c.id} title={c.name} className={"size-3.5 rounded-full ring-1 ring-white/30 " + (c.soldOut ? "opacity-30" : "")} style={{ background: c.hex }} />
-            ))}
-          </span>
-        </div>
-        <span className="mt-auto inline-flex min-h-11 items-center justify-center rounded-full border border-border px-3 text-center text-sm font-semibold transition-colors group-hover:border-primary group-hover:bg-primary group-hover:text-white">
-          {out ? "Ver detalles" : "Elegir talla y color"}
-        </span>
-      </div>
-    </button>
-  )
-}
-
-/** Mini pantallas del proceso real (decorativas: el texto del paso ya lo explica). */
-function StepPreview({ step, product }: { step: number; product?: Product }) {
-  const name = product?.name ?? "Tu prenda"
-  const price = product ? formatCOP(product.price) : ""
-  const color = product?.colors.find((c) => !c.soldOut) ?? product?.colors[0]
-  if (step === 0)
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <span className="inline-flex h-8 items-center gap-1.5 rounded-full border-2 border-primary bg-primary/10 pl-1 pr-3 text-xs font-semibold">
-            <span className="grid size-5 place-items-center rounded-full ring-1 ring-ink/20" style={{ background: color?.hex ?? "#0a0b0d" }}>
-              <Check className="size-3 text-white mix-blend-difference" strokeWidth={3} />
-            </span>
-            {color?.name ?? "Negro"}
-          </span>
-        </div>
-        <div className="flex gap-1.5">
-          {["S", "M", "L", "XL"].map((s) => (
-            <span key={s} className={"grid h-8 min-w-9 place-items-center rounded-lg border-2 text-xs font-semibold " + (s === "M" ? "border-primary bg-primary text-white" : "border-ink/15")}>
-              {s}
-            </span>
-          ))}
-        </div>
-      </div>
-    )
-  if (step === 1)
-    return (
-      <div className="space-y-2 text-xs">
-        {[
-          ["Nombre completo", "Laura Gómez"],
-          ["Dirección exacta", "Cra 70 # 44-21, Laureles"],
-        ].map(([k, v]) => (
-          <div key={k}>
-            <p className="mb-1 font-semibold text-ink/60">{k}</p>
-            <p className="flex h-8 items-center rounded-lg border border-ink/15 bg-white px-3">{v}</p>
-          </div>
-        ))}
-      </div>
-    )
-  return (
-    <div className="ml-auto max-w-[92%] rounded-lg rounded-tr-none bg-[#d9fdd3] p-3 text-xs leading-relaxed text-ink">
-      <p className="font-bold">🛍️ NUEVO PEDIDO · VIPER STORE</p>
-      <p className="mt-1 truncate">1 × {name} · Talla M</p>
-      {price && <p className="font-semibold tabular-nums">Total productos: {price}</p>}
-      <p className="mt-1 text-right text-[11px] text-ink/50">✓✓</p>
-    </div>
-  )
-}
-
-const STEPS = [
-  { k: "Elige tu prenda", v: "Toca la que te guste, escoge color y talla, y agrégala a la bolsa." },
-  { k: "Llena tus datos", v: "Nombre, dirección de entrega y si pagas por Nequi o contraentrega." },
-  { k: "Confirma por WhatsApp", v: "Se abre el chat con tu pedido ya escrito. Solo tocas Enviar." },
+const CATEGORY_TILES: { num: string; label: string; cat: Category; img: string; accent: string }[] = [
+  { num: "01", label: "HOODIES", cat: "Hoodies", img: CATEGORY_IMAGES.Hoodies, accent: "#1A1E24" },
+  { num: "02", label: "CARGOS", cat: "Cargos", img: CATEGORY_IMAGES.Cargos, accent: "#1E3A5F" },
+  { num: "03", label: "CAMISETAS", cat: "Camisetas", img: CATEGORY_IMAGES.Camisetas, accent: "#1A1E24" },
+  { num: "04", label: "ACCESORIOS", cat: "Accesorios", img: CATEGORY_IMAGES.Accesorios, accent: "#2A313B" },
 ]
+
+const STREET_GALLERY = [
+  { handle: "@santi.street", bg: "#1A1E24", img: "https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=500&h=640&fit=crop&q=80" },
+  { handle: "@valen.drip", bg: "#1E3A5F", img: "https://images.unsplash.com/photo-1523398002811-999ca8dec234?w=500&h=640&fit=crop&q=80" },
+  { handle: "@mateo.med", bg: "#2A313B", img: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=500&h=640&fit=crop&q=80" },
+  { handle: "@cami.urban", bg: "#1A1E24", img: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&h=640&fit=crop&q=80" },
+  { handle: "@juan.kicks", bg: "#2A313B", img: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=500&h=640&fit=crop&q=80" },
+  { handle: "@viper.store", bg: "#1E3A5F", img: BRAND_FACHADA_IMG },
+]
+
+const LOOKBOOK_BG = "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=900&h=1100&fit=crop&q=80"
+
+const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+
+/** Calcula cuánto falta para el próximo viernes a las 8:00 PM */
+function getNextDropCountdown() {
+  const now = new Date()
+  const target = new Date(now)
+  const day = now.getDay() // 5 = viernes
+  let daysUntilFriday = (5 - day + 7) % 7
+  if (daysUntilFriday === 0 && now.getHours() >= 20) daysUntilFriday = 7
+  target.setDate(now.getDate() + daysUntilFriday)
+  target.setHours(20, 0, 0, 0)
+  const diff = Math.max(0, target.getTime() - now.getTime())
+  const d = Math.floor(diff / 86_400_000)
+  const h = Math.floor((diff % 86_400_000) / 3_600_000)
+  const m = Math.floor((diff % 3_600_000) / 60_000)
+  const s = Math.floor((diff % 60_000) / 1000)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return {
+    full: `${pad(d)} : ${pad(h)} : ${pad(m)} : ${pad(s)}`,
+    compact: `${pad(d)}:${pad(h)}:${pad(m)}`,
+  }
+}
 
 export default function App() {
   const catalog = useCatalog()
   const cart = useCart()
-  const [productId, setProductId] = useState<string | null>(null)
-  const [cartOpen, setCartOpen] = useState(false)
+  const count = cartCount(cart)
+
+  const [filter, setFilter] = useState<FilterOption>("Todo")
+  const [searchOpen, setSearchOpen] = useState(false)
   const [query, setQuery] = useState("")
-  const [showAll, setShowAll] = useState(false)
-  const searchRef = useRef<HTMLInputElement>(null)
-  useReveal()
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
+  const [stage, setStage] = useState<CheckoutStage>("off")
+  const [infoModal, setInfoModal] = useState<InfoModalType>(null)
+
+  // Animación carrito volador, rebote y toast
+  const [flyers, setFlyers] = useState<Flyer[]>([])
+  const [justAdded, setJustAdded] = useState<Record<string, number>>({})
+  const [bump, setBump] = useState(0)
+  const [toast, setToast] = useState<ToastState>(null)
+  const seqRef = useRef(0)
+  const timersRef = useRef<number[]>([])
+  const cartBtnRef = useRef<HTMLButtonElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+
+  // Countdown en vivo
+  const [countdown, setCountdown] = useState(getNextDropCountdown)
+
+  // Lookbook hotspot activo
+  const [activeHotspot, setActiveHotspot] = useState<number>(0)
+
+  // Lista VIP del drop
+  const [dropContact, setDropContact] = useState("")
+  const [dropJoined, setDropJoined] = useState<string | null>(null)
+  const [dropError, setDropError] = useState("")
+
   useEffect(() => {
     syncCatalog()
   }, [])
 
-  const product = catalog.find((p) => p.id === productId) ?? null
-  const closeProduct = useCallback(() => setProductId(null), [])
-  const closeCart = useCallback(() => setCartOpen(false), [])
-  const openCart = useCallback(() => setCartOpen(true), [])
+  useEffect(() => {
+    const id = window.setInterval(() => setCountdown(getNextDropCountdown()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
 
-  const goCatalog = (opts?: { all?: boolean; focus?: boolean }) => {
-    if (opts?.all) {
-      setShowAll(true)
-      setQuery("")
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
+
+  useEffect(() => {
+    return () => {
+      timersRef.current.forEach((t) => window.clearTimeout(t))
     }
-    document.getElementById("catalogo")?.scrollIntoView({ behavior: "smooth" })
-    if (opts?.focus) window.setTimeout(() => searchRef.current?.focus({ preventScroll: true }), 500)
+  }, [])
+
+  const schedule = useCallback((fn: () => void, ms: number) => {
+    const t = window.setTimeout(fn, ms)
+    timersRef.current.push(t)
+  }, [])
+
+  const triggerFlyAndAdd = useCallback(
+    (p: Product, color: ColorVariant, size: string, e?: React.MouseEvent<HTMLButtonElement>) => {
+      const btn = e?.currentTarget
+      const cartEl = cartBtnRef.current
+      let x = window.innerWidth / 2
+      let y = window.innerHeight / 2
+      let tx = window.innerWidth - 60
+      let ty = 48
+      if (btn) {
+        const r = btn.getBoundingClientRect()
+        x = r.left + r.width / 2
+        y = r.top + r.height / 2
+      }
+      if (cartEl) {
+        const c = cartEl.getBoundingClientRect()
+        tx = c.left + c.width / 2
+        ty = c.top + c.height / 2
+      }
+
+      const id = ++seqRef.current
+      setFlyers((prev) => [...prev, { id, x, y, tx, ty, go: false }])
+      setJustAdded((prev) => ({ ...prev, [p.id]: id }))
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setFlyers((prev) => prev.map((f) => (f.id === id ? { ...f, go: true } : f)))
+        })
+      })
+
+      schedule(() => {
+        addToCart(p, color, size, 1)
+        setFlyers((prev) => prev.filter((f) => f.id !== id))
+        setBump((b) => b + 1)
+        setToast({ id, text: `${p.name} agregado` })
+      }, 680)
+
+      schedule(() => {
+        setJustAdded((prev) => {
+          if (prev[p.id] !== id) return prev
+          const copy = { ...prev }
+          delete copy[p.id]
+          return copy
+        })
+        setToast((prev) => (prev && prev.id === id ? null : prev))
+      }, 3200)
+    },
+    [schedule],
+  )
+
+  const handleQuickAdd = useCallback(
+    (p: Product, e: React.MouseEvent<HTMLButtonElement>) => {
+      if (isSoldOut(p)) {
+        setSelectedProduct(p)
+        return
+      }
+      const color = p.colors.find((c) => !c.soldOut) ?? p.colors[0]
+      const size =
+        p.sizes.find((s) => !s.soldOut && s.label === "M")?.label ??
+        p.sizes.find((s) => !s.soldOut)?.label ??
+        p.sizes[0]?.label ??
+        "M"
+      triggerFlyAndAdd(p, color, size, e)
+    },
+    [triggerFlyAndAdd],
+  )
+
+  const filteredProducts = useMemo(() => {
+    const q = norm(query.trim())
+    return catalog.filter((p) => {
+      const cat = inferCategory(p)
+      if (filter !== "Todo" && cat !== filter) return false
+      if (!q) return true
+      const haystack = norm(
+        [p.name, p.description, p.tag ?? "", cat, ...p.colors.map((c) => c.name)].join(" "),
+      )
+      return haystack.includes(q)
+    })
+  }, [catalog, filter, query])
+
+  // 3 prendas para el lookbook interactivo "Arma tu outfit"
+  const outfitPieces = useMemo(() => {
+    const hoodie = catalog.find((p) => inferCategory(p) === "Hoodies" && !isSoldOut(p)) ?? catalog[0]
+    const cargo = catalog.find((p) => inferCategory(p) === "Cargos" && !isSoldOut(p)) ?? catalog[1] ?? catalog[0]
+    const acc = catalog.find((p) => inferCategory(p) === "Accesorios" && !isSoldOut(p)) ?? catalog[2] ?? catalog[0]
+    return [
+      { product: hoodie, left: "44%", top: "24%", label: "Parte superior" },
+      { product: cargo, left: "56%", top: "52%", label: "Pantalón" },
+      { product: acc, left: "34%", top: "64%", label: "Accesorio" },
+    ].filter((x) => Boolean(x.product))
+  }, [catalog])
+
+  const jumpToCategory = (cat: FilterOption) => {
+    setFilter(cat)
+    document.getElementById("tienda")?.scrollIntoView({ behavior: "smooth" })
   }
 
-  /* Buscador: nombre, descripción, etiqueta y colores */
-  const q = norm(query.trim())
-  const results = useMemo(
-    () => (q ? catalog.filter((p) => norm([p.name, p.description, p.tag ?? "", ...p.colors.map((c) => c.name)].join(" ")).includes(q)) : catalog),
-    [catalog, q],
-  )
-  const visible = q || showAll ? results : results.slice(0, FIRST)
-  const hidden = results.length - visible.length
+  const handleAddFullOutfit = () => {
+    outfitPieces.forEach(({ product }) => {
+      if (!product || isSoldOut(product)) return
+      const c = product.colors.find((x) => !x.soldOut) ?? product.colors[0]
+      const s =
+        product.sizes.find((x) => !x.soldOut && x.label === "M")?.label ??
+        product.sizes.find((x) => !x.soldOut)?.label ??
+        "M"
+      addToCart(product, c, s, 1)
+    })
+    setBump((b) => b + 1)
+    const id = ++seqRef.current
+    setToast({ id, text: `Look completo (${outfitPieces.length} prendas) agregado` })
+    schedule(() => {
+      setToast((prev) => (prev && prev.id === id ? null : prev))
+    }, 3400)
+  }
 
-  /* Lookbook: las primeras prendas disponibles del catálogo real */
-  const lookProducts = useMemo(() => catalog.filter((p) => !isSoldOut(p) && p.colors.some((c) => c.images.length)).slice(0, 6), [catalog])
-  const looks: RunwayLook[] = useMemo(
-    () =>
-      lookProducts.map((p) => {
-        const colors = p.colors.filter((c) => !c.soldOut && c.images.length)
-        return {
-          src: colors[0].images[0],
-          alt: p.name,
-          products: colors.slice(0, 3).map((c) => ({ name: `${p.name} · ${c.name}`, price: formatCOP(p.price), src: c.images[0] })),
-        }
-      }),
-    [lookProducts],
-  )
+  const handleDropSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    const clean = dropContact.trim()
+    if (clean.length < 5) {
+      setDropError("Escribe tu correo o número de WhatsApp.")
+      return
+    }
+    setDropError("")
+    dropListStore.set((list) => (list.includes(clean) ? list : [clean, ...list]))
+    setDropJoined(clean)
+    setDropContact("")
+  }
+
+  const bumpClass = bump === 0 ? "" : bump % 2 ? "vs-bump-a" : "vs-bump-b"
+  const showMobileBar = count > 0 && stage === "off" && !selectedProduct && !infoModal
+  const waDirect = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hola Viper Store, quiero info sobre las prendas del Drop 04.")}`
 
   return (
-    <div id="top" className="grain relative min-h-screen overflow-x-clip bg-background text-foreground">
-      <a href="#catalogo" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-full focus:bg-foreground focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-background">
-        Saltar al catálogo
-      </a>
-      <Header cart={cartCount(cart)} onCart={openCart} onSearch={() => goCatalog({ focus: true })} />
+    <div className="min-h-[100dvh] w-full bg-[#0B0D10] font-sans text-[#E8EAED]">
+      {/* ───────── Top Marquee Eléctrico ───────── */}
+      <div className="overflow-hidden whitespace-nowrap bg-[#2E8BFF] py-2 font-mono text-[11px] font-medium tracking-[0.14em] text-[#0B0D10] sm:py-2.5 sm:text-[12px] sm:tracking-[0.16em]">
+        <div className="vs-marquee">
+          {[0, 1, 2, 3].map((k) => (
+            <span key={k} className="pr-10 sm:pr-12">
+              ROPA TAN CHIMBA QUE NO SE REPITE ✦ DROP 04 CAE ESTE VIERNES 8 PM · SIN RESTOCK ✦ ENVÍO GRATIS DESDE {formatCOP(FREE_SHIPPING_FROM)} ✦ PEDIDOS POR WHATSAPP {WHATSAPP_DISPLAY} ✦ LOCAL SUPPORT LOCAL ✦
+            </span>
+          ))}
+        </div>
+      </div>
 
-      <main>
-        {/* ───────── PORTADA ───────── */}
-        <section className="relative isolate pt-20 sm:pt-24">
-          <div className="mx-auto grid max-w-[1400px] gap-10 px-4 pb-10 sm:px-8 lg:grid-cols-12 lg:gap-6 lg:pb-0">
-            <div className="relative z-10 flex flex-col justify-center lg:col-span-6 lg:py-16">
-              <h1 className="font-display uppercase leading-[0.84]">
-                <span className="hero-in block text-[clamp(4.2rem,15vw,11rem)]" style={{ ["--d" as string]: "80ms" }}>
-                  Ropa tan
-                </span>
-                <span className="hero-in relative block text-[clamp(4.2rem,15vw,11rem)]" style={{ ["--d" as string]: "160ms" }}>
-                  <span className="relative z-10 text-primary">chimba</span>
-                  <svg aria-hidden viewBox="0 0 300 20" className="absolute -bottom-1 left-0 w-[min(60%,26rem)] text-primary/60" preserveAspectRatio="none">
-                    <path d="M2 14 C 60 4, 140 4, 298 10" fill="none" stroke="currentColor" strokeWidth="5" strokeLinecap="round" className="draw" />
-                  </svg>
-                </span>
-              </h1>
+      {/* ───────── Header Sticky ───────── */}
+      <header className="sticky top-0 z-40 border-b border-[#2A313B] bg-[#0B0D10]/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-3.5">
+          <a href="#drop" aria-label="Viper Store, inicio" className="shrink-0 no-underline">
+            <Logo />
+          </a>
 
-              <p className="hero-in mt-8 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg" style={{ ["--d" as string]: "320ms" }}>
-                Ropa con corona. Elige tu prenda, su color y su talla, y confirma el pedido por WhatsApp en un minuto.
-              </p>
+          <nav className="hidden items-center gap-6 text-[14px] font-medium xl:gap-8 xl:text-[15px] lg:flex">
+            <a href="#drop" className="whitespace-nowrap text-[#E8EAED] transition-colors hover:text-[#2E8BFF]">
+              Drop
+            </a>
+            <button
+              type="button"
+              onClick={() => jumpToCategory("Hoodies")}
+              className="whitespace-nowrap border-0 bg-transparent p-0 text-[14px] font-medium text-[#E8EAED] transition-colors hover:text-[#2E8BFF] xl:text-[15px]"
+            >
+              Hoodies
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToCategory("Cargos")}
+              className="whitespace-nowrap border-0 bg-transparent p-0 text-[14px] font-medium text-[#E8EAED] transition-colors hover:text-[#2E8BFF] xl:text-[15px]"
+            >
+              Cargos
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToCategory("Camisetas")}
+              className="whitespace-nowrap border-0 bg-transparent p-0 text-[14px] font-medium text-[#E8EAED] transition-colors hover:text-[#2E8BFF] xl:text-[15px]"
+            >
+              Camisetas
+            </button>
+            <button
+              type="button"
+              onClick={() => jumpToCategory("Accesorios")}
+              className="whitespace-nowrap border-0 bg-transparent p-0 text-[14px] font-medium text-[#E8EAED] transition-colors hover:text-[#2E8BFF] xl:text-[15px]"
+            >
+              Accesorios
+            </button>
+            <a href="#outfit" className="whitespace-nowrap text-[#E8EAED] transition-colors hover:text-[#2E8BFF]">
+              Arma tu outfit
+            </a>
+          </nav>
 
-              <div className="hero-in mt-9 flex flex-col gap-3 sm:flex-row" style={{ ["--d" as string]: "400ms" }}>
-                <button type="button" onClick={() => goCatalog({ all: true })} className="btn-primary group">
-                  Ver todo el catálogo
-                  <ArrowDown className="size-4 transition-transform duration-200 group-hover:translate-y-0.5" />
-                </button>
-                <button type="button" onClick={() => goCatalog({ focus: true })} className="btn-ghost">
-                  <Search className="size-4" /> Buscar una prenda
-                </button>
-              </div>
-            </div>
+          <div className="flex shrink-0 items-center gap-2.5">
+            <button
+              type="button"
+              aria-label="Buscar prendas"
+              aria-expanded={searchOpen}
+              onClick={() => {
+                setSearchOpen((v) => !v)
+                if (!searchOpen) {
+                  setTimeout(() => document.getElementById("tienda")?.scrollIntoView({ behavior: "smooth" }), 80)
+                }
+              }}
+              className="vs-press flex h-11 w-11 items-center justify-center rounded-full border bg-transparent text-[#E8EAED]"
+              style={{ borderColor: searchOpen || query ? "#2E8BFF" : "#2A313B" }}
+            >
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M20 20l-3.5-3.5" />
+              </svg>
+            </button>
 
-            <div className="relative lg:col-span-6 lg:py-10">
-              <div className="hero-in relative mx-auto max-w-[560px] lg:ml-auto" style={{ ["--d" as string]: "200ms" }}>
-                <div className="relative overflow-hidden rounded-2xl shadow-lift ring-1 ring-white/10 sm:rotate-[1.5deg]">
-                  <img src="/img/fachada.jpeg" alt="Vitrina de Viper Store con grafiti azul: Hptas no vendan ropa tan chimba" className="aspect-[4/5] w-full object-cover" {...{ fetchpriority: "high" }} />
-                </div>
-                <span className="sticker absolute -left-3 top-8 -rotate-[8deg] bg-primary text-white sm:-left-8">Good vibes only ☺</span>
-                <span className="sticker absolute -right-2 top-1/2 rotate-[6deg] bg-foreground text-background sm:-right-6">Local support local</span>
-                <LogoBadge className="absolute -bottom-6 left-6 size-24 -rotate-6 sm:size-28" />
-              </div>
-            </div>
+            <button
+              ref={cartBtnRef}
+              type="button"
+              data-cart="1"
+              onClick={() => {
+                setToast(null)
+                setStage("cart")
+              }}
+              aria-label={`Abrir carrito (${count})`}
+              className={`vs-press ${bumpClass} flex h-11 items-center gap-2 rounded-full border border-[#2A313B] bg-[#1A1E24] pr-1.5 pl-3 text-[14px] font-semibold text-[#E8EAED] sm:gap-2.5 sm:pr-2 sm:pl-4`}
+            >
+              <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+                <path d="M5 8h14l-1 12H6L5 8z" />
+                <path d="M9 8V6a3 3 0 016 0v2" />
+              </svg>
+              <span className="hidden sm:inline">Carrito</span>
+              <span
+                className="flex h-[26px] min-w-[26px] items-center justify-center rounded-full px-1.5 font-mono text-[12px] transition-colors sm:text-[13px]"
+                style={
+                  count > 0
+                    ? { background: "#2E8BFF", color: "#0B0D10" }
+                    : { background: "#2A313B", color: "#B8BFCA" }
+                }
+              >
+                {count}
+              </span>
+            </button>
           </div>
-
-          <p aria-hidden className="select-none overflow-hidden whitespace-nowrap text-center font-display text-[19.5vw] uppercase leading-[0.8] text-white/[0.05] lg:-mt-6">
-            Viper Store
-          </p>
-        </section>
-
-        <div className="relative z-10 -mt-[4vw] py-6">
-          <Marquee className="-rotate-2 bg-primary py-3 text-white sm:py-4" />
         </div>
 
-        {/* ───────── LOOKBOOK con la ropa del catálogo ───────── */}
-        {looks.length >= 2 && (
-          <section id="lookbook" aria-label="Lookbook">
-            <RunwayLookbook
-              className="vs-look"
-              looks={looks}
-              loop={false}
-              scrollPerLook={0.45}
-              nav={[]}
-              title="Lookbook · Drop 01"
-              blurb="La ropa del drop, en fila. Baja con el scroll: la del frente es la que puedes pedir."
-              lookLabel="Look"
-              caption={(i) =>
-                lookProducts[i] && (
-                  <div className="look-cap">
-                    <span className="look-name">{lookProducts[i].name}</span>
-                    <span className="look-price">{formatCOP(lookProducts[i].price)}</span>
-                  </div>
-                )
-              }
-              ctaLabel="Elegir talla y color →"
-              onShopLook={(i) => lookProducts[i] && setProductId(lookProducts[i].id)}
-              onCardClick={(i) => lookProducts[i] && setProductId(lookProducts[i].id)}
-              ariaLabel="Lookbook Viper Store"
-            />
-          </section>
-        )}
-
-        {/* ───────── CATÁLOGO ───────── */}
-        <section id="catalogo" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-16 sm:px-8 sm:py-24">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <h2 className="font-display text-[clamp(3rem,8vw,6rem)] uppercase leading-[0.85]">Toda la ropa</h2>
-            <p className="max-w-xs text-[15px] text-muted-foreground">Toca una prenda para ver sus fotos y elegir color y talla.</p>
-          </div>
-
-          {/* Buscador */}
-          <div className="mt-8">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
-              <label htmlFor="buscar" className="sr-only">Buscar en el catálogo</label>
+        {/* Barra de búsqueda desplegable */}
+        {searchOpen && (
+          <div className="border-t border-[#2A313B] bg-[#0B0D10]">
+            <div className="mx-auto flex max-w-[1280px] items-center gap-2.5 px-4 py-3 sm:px-6">
               <input
-                id="buscar"
-                ref={searchRef}
+                ref={searchInputRef}
                 type="search"
-                enterKeyHint="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Busca una prenda o un color…"
-                className="input h-14 rounded-full pl-12 pr-14 [&::-webkit-search-cancel-button]:hidden"
+                placeholder="Buscar hoodie, cargo, negro, gorra..."
+                className="vp-in h-11 flex-1 border border-[#3A424E] bg-[#1A1E24] px-4 text-[16px] text-[#F2F4F7] placeholder:text-[#8A94A3] sm:text-[15px]"
               />
               {query && (
-                <button type="button" onClick={() => { setQuery(""); searchRef.current?.focus() }} aria-label="Borrar búsqueda" className="absolute right-1.5 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full text-muted-foreground hover:text-foreground">
-                  <X className="size-5" />
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  className="vs-press h-11 border border-[#2A313B] bg-transparent px-4 text-[13px] font-semibold text-[#C3CAD4]"
+                >
+                  Limpiar
+                </button>
+              )}
+              <button
+                type="button"
+                aria-label="Cerrar búsqueda"
+                onClick={() => setSearchOpen(false)}
+                className="vs-press flex h-11 w-11 items-center justify-center border border-[#2A313B] bg-transparent text-[#E8EAED]"
+              >
+                <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* ───────── Hero Principal (Vitrina limpia sin ícono VIPER TV) ───────── */}
+      <section
+        id="drop"
+        className="relative flex min-h-[540px] items-end overflow-hidden border-b border-[#2A313B] md:min-h-[620px] lg:min-h-[660px]"
+      >
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+          <img
+            className="vs-kb absolute inset-0 h-full w-full object-cover"
+            src={BRAND_FACHADA_IMG}
+            alt=""
+            style={{ objectPosition: "center 42%" }}
+          />
+          <div className="vs-sweep" />
+        </div>
+
+        {/* Gradientes limpios para contraste */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 md:hidden"
+          style={{
+            background:
+              "linear-gradient(0deg, rgba(11,13,16,1) 0%, rgba(11,13,16,.84) 40%, rgba(11,13,16,.28) 76%, rgba(11,13,16,.45) 100%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 hidden md:block"
+          style={{
+            background:
+              "linear-gradient(90deg, rgba(11,13,16,.95) 0%, rgba(11,13,16,.80) 44%, rgba(11,13,16,.30) 100%)",
+          }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute right-0 bottom-0 left-0 h-[140px]"
+          style={{ background: "linear-gradient(0deg, #0B0D10, rgba(11,13,16,0))" }}
+        />
+
+        {/* Contenido Hero con espaciado respirable */}
+        <div className="relative z-10 mx-auto flex w-full max-w-[1280px] flex-wrap items-end justify-between gap-8 px-4 pt-16 pb-8 sm:px-6 md:py-16 lg:py-20">
+          <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5 md:gap-6">
+            <div className="font-mono text-[11px] tracking-[0.2em] text-[#C3CAD4] md:text-[13px]">
+              VIPER STORE · DROP 04 &ldquo;NOCTURNO&rdquo;
+            </div>
+
+            <h1 className="m-0 font-display text-[54px] font-normal leading-[0.98] tracking-[0.01em] text-[#F2F4F7] sm:text-[78px] lg:text-[106px]">
+              <span className="block">ROPA TAN</span>
+              <span className="font-marker my-1 inline-block -rotate-[2.5deg] text-[62px] leading-[1.08] text-[#2E8BFF] sm:my-1.5 sm:text-[88px] lg:text-[118px]">
+                chimba
+              </span>
+              <span className="block">QUE NO SE REPITE.</span>
+            </h1>
+
+            <p className="m-0 max-w-[460px] text-[15px] leading-[1.6] text-[#D5DAE1] sm:text-[17px]">
+              Hoodies pesados, cargos y camisetas en negro, blanco y azul eléctrico. Piezas limitadas, hechas pa&apos; la calle.
+            </p>
+
+            {/* CTAs */}
+            <div className="mt-1 flex flex-wrap items-stretch gap-3">
+              <a
+                href="#tienda"
+                className="vs-press inline-flex h-[52px] flex-1 items-center justify-center bg-[#2E8BFF] px-7 text-[14px] font-bold tracking-[0.04em] text-[#0B0D10] no-underline sm:flex-none sm:text-[15px]"
+              >
+                COMPRAR EL DROP
+              </a>
+              <a
+                href="#outfit"
+                className="vs-press hidden h-[52px] items-center justify-center border border-[#F2F4F7] bg-[rgba(11,13,16,0.45)] px-7 text-[15px] font-semibold text-[#F2F4F7] no-underline sm:inline-flex"
+              >
+                Ver lookbook
+              </a>
+              {/* Contador compacto en móvil */}
+              <div className="flex h-[52px] flex-col justify-center border border-[#3A424E] bg-[rgba(11,13,16,0.72)] px-3.5 md:hidden">
+                <span className="font-mono text-[9px] tracking-[0.14em] text-[#8A94A3]">CAE EN</span>
+                <span className="mt-0.5 font-display text-[18px] leading-none text-[#F2F4F7] tabular-nums">
+                  {countdown.compact}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Contador desktop */}
+          <div className="hidden max-w-[360px] flex-[1_1_280px] flex-col gap-2 border border-[#2A313B] bg-[rgba(11,13,16,0.88)] px-6 py-5 backdrop-blur-sm md:flex">
+            <div className="font-mono text-[11px] tracking-[0.18em] text-[#8A94A3]">EL DROP CAE EN</div>
+            <div className="font-display text-[40px] leading-none tracking-[0.05em] text-[#F2F4F7] tabular-nums">
+              {countdown.full}
+            </div>
+            <div className="font-mono text-[11px] tracking-[0.16em] text-[#8A94A3]">DÍAS · HORAS · MIN · SEG</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ───────── 4 Categorías con imágenes reales (Móvil 2x2 y Desktop 4x1) ───────── */}
+      <section className="mx-auto max-w-[1280px] px-4 pt-12 sm:px-6 sm:pt-16">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          {CATEGORY_TILES.map((tile) => (
+            <button
+              key={tile.num}
+              type="button"
+              onClick={() => jumpToCategory(tile.cat)}
+              className="vs-tile group relative flex h-[156px] flex-col justify-between overflow-hidden border border-[#2A313B] p-4 text-left sm:h-[210px] sm:p-5"
+              style={{ backgroundColor: tile.accent }}
+            >
+              <img
+                src={tile.img}
+                alt={tile.label}
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover opacity-55 transition-transform duration-500 group-hover:scale-105"
+              />
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0"
+                style={{ background: "linear-gradient(180deg, rgba(11,13,16,0.35) 0%, rgba(11,13,16,0.88) 100%)" }}
+              />
+              <span className="relative z-10 font-mono text-[11px] tracking-[0.16em] text-[#C3CAD4] sm:text-[12px]">
+                {tile.num}
+              </span>
+              <span className="relative z-10 font-display text-[26px] leading-none text-[#F2F4F7] sm:text-[34px]">
+                {tile.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* ───────── Catálogo: LO MÁS MOVIDO ───────── */}
+      <section id="tienda" className="mx-auto max-w-[1280px] pt-14 sm:px-6 sm:pt-20">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-4 px-4 sm:mb-8 sm:px-0">
+          <div>
+            <h2 className="m-0 font-display text-[36px] font-normal leading-none text-[#F2F4F7] sm:text-[52px]">
+              LO MÁS MOVIDO
+            </h2>
+            {query.trim() && (
+              <p className="mt-2 font-mono text-[12px] text-[#8A94A3]">
+                Mostrando {filteredProducts.length} resultados para &ldquo;{query.trim()}&rdquo;
+              </p>
+            )}
+          </div>
+
+          {/* Filtros Desktop */}
+          <div className="hidden flex-wrap gap-2 sm:flex">
+            {FILTER_LABELS.map((l) => {
+              const on = filter === l
+              return (
+                <button
+                  key={l}
+                  type="button"
+                  onClick={() => setFilter(l)}
+                  className="vs-press h-11 rounded-full px-5 text-[14px] font-semibold"
+                  style={
+                    on
+                      ? { background: "#E8EAED", color: "#0B0D10", border: "1px solid #E8EAED" }
+                      : { background: "transparent", color: "#E8EAED", border: "1px solid #2A313B" }
+                  }
+                >
+                  {l}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Filtros scroll horizontal en móvil */}
+        <div className="vs-scroll flex gap-2 overflow-x-auto px-4 pb-5 sm:hidden">
+          {FILTER_LABELS.map((l) => {
+            const on = filter === l
+            return (
+              <button
+                key={l}
+                type="button"
+                onClick={() => setFilter(l)}
+                className="vs-press h-10 shrink-0 rounded-full px-4 text-[13px] font-semibold"
+                style={
+                  on
+                    ? { background: "#F2F4F7", color: "#0B0D10", border: "1px solid #F2F4F7" }
+                    : { background: "transparent", color: "#F2F4F7", border: "1px solid #2A313B" }
+                }
+              >
+                {l}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Grid de Productos */}
+        {filteredProducts.length === 0 ? (
+          <div className="mx-4 border border-dashed border-[#3A424E] px-6 py-14 text-center sm:mx-0">
+            <div className="font-display text-[28px] text-[#F2F4F7]">NO ENCONTRAMOS PRENDAS</div>
+            <p className="mt-2 text-[14px] text-[#8A94A3]">Prueba otra categoría o limpia el buscador.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setFilter("Todo")
+                setQuery("")
+              }}
+              className="vs-press mt-5 h-11 bg-[#2E8BFF] px-6 text-[14px] font-bold text-[#0B0D10]"
+            >
+              Ver todo el catálogo
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-x-3 gap-y-6 px-4 sm:grid-cols-2 sm:gap-6 sm:px-0 md:grid-cols-3 lg:grid-cols-4">
+            {filteredProducts.map((p) => {
+              const soldOut = isSoldOut(p)
+              const primaryColor = p.colors.find((c) => !c.soldOut) ?? p.colors[0]
+              const img = primaryColor?.images[0] ?? ""
+              const added = Boolean(justAdded[p.id])
+
+              return (
+                <article key={p.id} className="vs-card flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProduct(p)}
+                    aria-label={`Ver ${p.name}, ${formatCOP(p.price)}`}
+                    className="vs-photo relative flex aspect-[4/5] w-full flex-col justify-between overflow-hidden border-0 bg-[#1A1E24] p-2.5 text-left sm:p-3.5"
+                  >
+                    {img ? (
+                      <img
+                        src={img}
+                        alt={p.name}
+                        loading="lazy"
+                        className={`absolute inset-0 h-full w-full object-cover transition-transform duration-500 ${soldOut ? "opacity-40 grayscale" : ""}`}
+                      />
+                    ) : (
+                      <span className="mt-auto font-mono text-[10px] text-[#8A94A3] sm:text-[12px]">[FOTO PRODUCTO]</span>
+                    )}
+                    <span
+                      className="relative z-10 self-start bg-[#0B0D10]/90 px-2 py-1 font-mono text-[9px] tracking-[0.14em] text-[#F2F4F7] sm:px-2.5 sm:py-1 sm:text-[11px]"
+                      style={{ border: `1px solid ${soldOut ? "#E5484D" : "#2E8BFF"}` }}
+                    >
+                      {soldOut ? "AGOTADO" : p.tag || "NUEVO"}
+                    </span>
+                  </button>
+
+                  {/* Info producto */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProduct(p)}
+                    className="flex flex-1 flex-col gap-1 border-0 bg-transparent p-0 text-left sm:flex-row sm:items-start sm:justify-between sm:gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-1 text-[14px] font-semibold leading-snug text-[#F2F4F7] sm:text-[16px]">
+                        {p.name}
+                      </div>
+                      <div className="mt-1 flex items-center justify-between gap-1.5 text-[12px] text-[#8A94A3] sm:text-[13px]">
+                        <span className="truncate">{primaryColor?.name ?? "Negro"}</span>
+                        <span className="shrink-0 font-mono text-[#F2F4F7] sm:hidden">{formatCOP(p.price)}</span>
+                      </div>
+                    </div>
+                    <div className="hidden shrink-0 font-mono text-[14px] text-[#E8EAED] sm:block">
+                      {formatCOP(p.price)}
+                    </div>
+                  </button>
+
+                  {/* Botón Agregar rápido */}
+                  <button
+                    type="button"
+                    onClick={(e) => handleQuickAdd(p, e)}
+                    className="vs-press mt-auto h-11 w-full text-[13px] font-bold sm:text-[14px] sm:font-semibold"
+                    style={
+                      soldOut
+                        ? { background: "transparent", color: "#8A94A3", border: "1px solid #2A313B" }
+                        : added
+                          ? { background: "#2E8BFF", color: "#0B0D10", border: "1px solid #2E8BFF" }
+                          : { background: "transparent", color: "#F2F4F7", border: "1px solid #3A424E" }
+                    }
+                  >
+                    <span className="sm:hidden">{soldOut ? "Ver detalles" : added ? "✓ Agregado" : "Agregar +"}</span>
+                    <span className="hidden sm:inline">
+                      {soldOut ? "Agotado · Ver detalles" : added ? "✓ Agregado al carrito" : "Agregar rápido +"}
+                    </span>
+                  </button>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ───────── ARMA TU OUTFIT (Lookbook interactivo con hotspots) ───────── */}
+      <section id="outfit" className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
+        <div className="grid grid-cols-1 overflow-hidden border border-[#2A313B] bg-[#1A1E24] lg:grid-cols-2">
+          <div className="flex flex-col justify-center gap-5 p-6 sm:p-10 lg:p-14">
+            <div className="font-mono text-[12px] tracking-[0.2em] text-[#8A94A3]">ARMA TU OUTFIT</div>
+            <h2 className="m-0 font-display text-[40px] font-normal leading-[1.02] text-[#F2F4F7] sm:text-[52px]">
+              EL LOOK COMPLETO,
+              <br />
+              EN UN CLIC.
+            </h2>
+            <p className="m-0 max-w-[440px] text-[15px] leading-[1.6] text-[#B8BFCA] sm:text-[16px]">
+              Cada foto del lookbook tiene puntos sobre las prendas. Toca un punto, revisa la prenda o agrega todo el outfit junto.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={handleAddFullOutfit}
+                className="vs-press inline-flex h-[52px] items-center border-0 bg-[#E8EAED] px-7 text-[14px] font-bold text-[#0B0D10] sm:text-[15px]"
+              >
+                Agregar look completo
+              </button>
+              {outfitPieces[activeHotspot]?.product && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedProduct(outfitPieces[activeHotspot].product)}
+                  className="vs-press inline-flex h-[52px] items-center border border-[#3A424E] bg-transparent px-6 text-[14px] font-semibold text-[#F2F4F7]"
+                >
+                  Ver {outfitPieces[activeHotspot].product.name}
                 </button>
               )}
             </div>
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {QUICK.map((t) => {
-                const on = norm(t) === q
-                return (
+          </div>
+
+          <div className="relative min-h-[420px] overflow-hidden bg-[#2A313B] sm:min-h-[480px] lg:min-h-[520px]">
+            <img src={LOOKBOOK_BG} alt="Lookbook Viper Store" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B0D10]/90 via-transparent to-[#0B0D10]/25" />
+            <span className="absolute top-5 left-5 bg-[#0B0D10]/85 px-3 py-1.5 font-mono text-[11px] tracking-[0.15em] text-[#C3CAD4]">
+              LOOK 01 · DROP 04
+            </span>
+
+            {/* 3 Hotspots interactivos posicionados sobre el área superior/media */}
+            {outfitPieces.map((spot, idx) => {
+              const active = activeHotspot === idx
+              return (
+                <button
+                  key={spot.product.id + idx}
+                  type="button"
+                  aria-label={`Ver ${spot.product.name}`}
+                  onClick={() => setActiveHotspot(idx)}
+                  className="vs-hotspot absolute -mt-3.5 -ml-3.5 flex h-7 w-7 items-center justify-center rounded-full border-[3px] border-[#0B0D10] p-0 transition-transform"
+                  style={{
+                    left: spot.left,
+                    top: spot.top,
+                    background: active ? "#F2F4F7" : "#2E8BFF",
+                    transform: active ? "scale(1.2)" : "scale(1)",
+                  }}
+                >
+                  <span className="h-2 w-2 rounded-full bg-[#0B0D10]" />
+                </button>
+              )
+            })}
+
+            {/* Tarjeta flotante de la prenda seleccionada */}
+            {outfitPieces[activeHotspot]?.product && (
+              <div className="absolute right-4 bottom-4 left-4 flex items-center justify-between gap-3 border border-[#2A313B] bg-[#0B0D10]/95 p-4 backdrop-blur-sm">
+                <div className="min-w-0">
+                  <div className="font-mono text-[10px] tracking-[0.16em] text-[#2E8BFF]">
+                    {outfitPieces[activeHotspot].label.toUpperCase()}
+                  </div>
+                  <div className="mt-0.5 truncate text-[15px] font-semibold text-[#F2F4F7]">
+                    {outfitPieces[activeHotspot].product.name}
+                  </div>
+                  <div className="mt-0.5 font-mono text-[13px] text-[#C3CAD4]">
+                    {formatCOP(outfitPieces[activeHotspot].product.price)}
+                  </div>
+                </div>
+                <div className="flex shrink-0 gap-2">
                   <button
-                    key={t}
                     type="button"
-                    onClick={() => setQuery(on ? "" : t)}
-                    aria-pressed={on}
-                    className={"label h-11 shrink-0 rounded-full border px-4 transition-colors " + (on ? "border-primary bg-primary text-white" : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground")}
+                    onClick={() => setSelectedProduct(outfitPieces[activeHotspot].product)}
+                    className="vs-press h-10 border border-[#3A424E] bg-transparent px-3.5 text-[12px] font-semibold text-[#F2F4F7]"
                   >
-                    {t}
+                    Ver
                   </button>
-                )
-              })}
+                  <button
+                    type="button"
+                    onClick={(e) => handleQuickAdd(outfitPieces[activeHotspot].product, e)}
+                    className="vs-press h-10 border-0 bg-[#2E8BFF] px-4 text-[12px] font-bold text-[#0B0D10]"
+                  >
+                    + Agregar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ───────── NUESTRA VITRINA Y MARCA (usa las 2 imágenes reales de src/img) ───────── */}
+      <section className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
+        <div className="grid grid-cols-1 gap-5 border border-[#2A313B] bg-[#1A1E24] p-5 sm:p-8 lg:grid-cols-[1.15fr_1fr] lg:items-center lg:gap-10 lg:p-10">
+          <div className="grid grid-cols-[1.5fr_1fr] gap-3 sm:gap-4">
+            <div className="relative aspect-[4/5] overflow-hidden border border-[#2A313B] bg-[#0B0D10]">
+              <img
+                src={BRAND_FACHADA_IMG}
+                alt="Vitrina oficial de Viper Store"
+                loading="lazy"
+                className="h-full w-full object-cover object-center"
+              />
             </div>
-            <p className="label mt-4 text-muted-foreground" aria-live="polite">
-              {q ? `${results.length} ${results.length === 1 ? "resultado" : "resultados"} para “${query.trim()}”` : `${catalog.length} prendas`}
+            <div className="flex flex-col gap-3 sm:gap-4">
+              <div className="relative flex aspect-square items-center justify-center overflow-hidden border border-[#2A313B] bg-[#0B0D10]">
+                <img
+                  src={BRAND_LOGO_IMG}
+                  alt="Logo oficial Viper Store"
+                  loading="lazy"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <a
+                href={waDirect}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-1 flex-col justify-between border border-[#2A313B] bg-[#0B0D10] p-4 no-underline transition-colors hover:border-[#2E8BFF]"
+              >
+                <span className="font-mono text-[10px] tracking-[0.16em] text-[#2E8BFF]">WHATSAPP DIRECTO</span>
+                <div className="my-2 text-[12px] leading-relaxed text-[#8A94A3]">
+                  Pedidos, asesoría de tallas y envíos al instante.
+                </div>
+                <span className="font-display text-[22px] leading-none text-[#F2F4F7] sm:text-[26px]">
+                  {WHATSAPP_DISPLAY}
+                </span>
+              </a>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-5">
+            <div className="font-mono text-[12px] tracking-[0.2em] text-[#8A94A3]">LA VITRINA ES LA MARCA</div>
+            <h2 className="m-0 font-display text-[38px] font-normal leading-[1.02] text-[#F2F4F7] sm:text-[48px]">
+              CALLE COLOMBIANA CON <span className="font-marker text-[#2E8BFF]">corona</span>.
+            </h2>
+            <p className="m-0 text-[15px] leading-[1.65] text-[#C3CAD4] sm:text-[16px]">
+              Eliges tus prendas, llenas tus datos en un minuto y te confirmamos pago y envío directo por WhatsApp. También puedes pasar a recoger en nuestra tienda física.
+            </p>
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <span className="font-marker -rotate-[2deg] bg-[#F2F4F7] px-3 py-1.5 text-[14px] text-[#0B0D10]">
+                Good vibes only
+              </span>
+              <span className="border-2 border-[#F2F4F7] px-3 py-1.5 font-mono text-[11px] tracking-[0.15em] text-[#F2F4F7]">
+                LOCAL SUPPORT LOCAL
+              </span>
+              <span className="rotate-[2deg] bg-[#2E8BFF] px-3 py-1.5 font-mono text-[11px] font-medium tracking-[0.15em] text-[#0B0D10]">
+                DROP 04
+              </span>
+            </div>
+            <div className="pt-1">
+              <a
+                href={waDirect}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="vs-press inline-flex h-[50px] items-center justify-center bg-[#25D366] px-6 text-[14px] font-bold text-[#0B0D10] no-underline"
+              >
+                Escribir por WhatsApp ({WHATSAPP_DISPLAY})
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ───────── #VIPERSTORE EN LA CALLE ───────── */}
+      <section className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <h2 className="m-0 font-display text-[36px] font-normal leading-none text-[#F2F4F7] sm:text-[52px]">
+            #VIPERSTORE EN LA CALLE
+          </h2>
+          <div className="text-[14px] text-[#B8BFCA] sm:text-[15px]">Sube tu foto con el hashtag y sale aquí.</div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
+          {STREET_GALLERY.map((item) => (
+            <a
+              key={item.handle}
+              href={INSTAGRAM_URL || waDirect}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="vs-tile relative flex aspect-[4/5] items-end overflow-hidden p-3 font-mono text-[12px] text-[#E8EAED] no-underline"
+              style={{ backgroundColor: item.bg }}
+            >
+              <img src={item.img} alt={item.handle} loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-85" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B0D10]/90 via-transparent to-transparent" />
+              <span className="relative z-10">{item.handle}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* ───────── ENTRA A LA LISTA DEL DROP ───────── */}
+      <section className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
+        <div className="flex flex-wrap items-center justify-between gap-6 border border-[#2A313B] p-6 sm:p-10 lg:p-12">
+          <div className="flex max-w-[500px] flex-col gap-2.5">
+            <h2 className="m-0 font-display text-[34px] font-normal leading-none text-[#F2F4F7] sm:text-[44px]">
+              ENTRA A LA LISTA DEL DROP
+            </h2>
+            <p className="m-0 text-[15px] leading-[1.6] text-[#B8BFCA]">
+              Acceso 1 hora antes que todos y aviso por WhatsApp cuando caiga.
             </p>
           </div>
 
-          {catalog.length === 0 ? (
-            <p className="mt-8 rounded-2xl border border-border bg-surface p-10 text-center text-muted-foreground">Estamos preparando el próximo drop. Vuelve pronto.</p>
-          ) : results.length === 0 ? (
-            <div className="mt-8 rounded-2xl border border-border bg-surface p-10 text-center">
-              <p className="font-display text-3xl uppercase">No encontramos “{query.trim()}”</p>
-              <p className="mt-2 text-muted-foreground">Prueba con otra palabra o mira todo el catálogo.</p>
-              <button type="button" onClick={() => goCatalog({ all: true })} className="btn-primary mt-6">
-                Ver todo el catálogo
-              </button>
+          {dropJoined ? (
+            <div className="flex w-full flex-col gap-3 border border-[#2E8BFF]/40 bg-[#16243A] p-5 sm:w-auto sm:min-w-[380px]">
+              <div className="font-mono text-[11px] tracking-[0.15em] text-[#2E8BFF]">✓ YA ESTÁS EN LA LISTA</div>
+              <div className="text-[14px] leading-relaxed text-[#F2F4F7]">
+                Guardamos <strong>{dropJoined}</strong>. ¿Quieres confirmar por WhatsApp para recibir el aviso primero?
+              </div>
+              <div className="flex flex-wrap gap-2.5 pt-1">
+                <a
+                  href={buildDropListWhatsAppUrl(dropJoined)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="vs-press inline-flex h-11 items-center justify-center bg-[#25D366] px-4 text-[13px] font-bold text-[#0B0D10] no-underline"
+                >
+                  Confirmar por WhatsApp
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setDropJoined(null)}
+                  className="vs-press h-11 border border-[#3A424E] bg-transparent px-4 text-[13px] font-semibold text-[#F2F4F7]"
+                >
+                  Otro dato
+                </button>
+              </div>
             </div>
           ) : (
-            <>
-              <div className="mt-6 grid grid-cols-2 gap-x-3 gap-y-8 sm:gap-x-5 md:grid-cols-3 lg:grid-cols-4">
-                {visible.map((p) => (
-                  <ProductCard key={p.id} p={p} onOpen={() => setProductId(p.id)} />
-                ))}
-              </div>
-              {!q && results.length > FIRST && (
-                <div className="mt-12 flex justify-center">
-                  <button type="button" onClick={() => setShowAll((v) => !v)} className={showAll ? "btn-ghost w-full sm:w-auto" : "btn-primary w-full sm:w-auto"}>
-                    {showAll ? "Ver menos" : `Ver todo el catálogo (${hidden} más)`}
-                  </button>
+            <form onSubmit={handleDropSubmit} className="flex w-full flex-col gap-2 sm:w-auto">
+              <div className="flex w-full flex-wrap items-end gap-2.5 sm:w-auto">
+                <div className="flex flex-1 flex-col gap-1.5 sm:flex-none">
+                  <label htmlFor="vs-mail" className="text-[13px] text-[#B8BFCA]">
+                    Correo o WhatsApp
+                  </label>
+                  <input
+                    id="vs-mail"
+                    type="text"
+                    value={dropContact}
+                    onChange={(e) => {
+                      setDropContact(e.target.value)
+                      if (dropError) setDropError("")
+                    }}
+                    placeholder="tu@correo.com o 300..."
+                    className="vp-in h-[52px] w-full border border-[#8A94A3] bg-[#0B0D10] px-4 text-[16px] text-[#E8EAED] sm:w-[280px] sm:text-[15px]"
+                  />
                 </div>
-              )}
-            </>
-          )}
-        </section>
-
-        {/* ───────── CÓMO COMPRAR (sección clara) ───────── */}
-        <section id="como-comprar" className="scroll-mt-20 bg-paper py-16 text-ink sm:py-24">
-          <div className="mx-auto max-w-[1400px] px-4 sm:px-8">
-            <h2 data-reveal className="font-display text-[clamp(3rem,8vw,6rem)] uppercase leading-[0.85]">
-              Tres pasos y listo
-            </h2>
-            <ol className="mt-10 grid gap-3 md:grid-cols-3">
-              {STEPS.map((s, i) => (
-                <li key={s.k} data-reveal style={{ ["--d" as string]: `${i * 80}ms` }} className="flex flex-col rounded-2xl bg-white p-6 shadow-soft ring-1 ring-ink/10 sm:p-8">
-                  <p className="text-sm font-bold text-primary">Paso {i + 1}</p>
-                  <h3 className="mt-2 font-display text-3xl uppercase">{s.k}</h3>
-                  <p className="mt-2 text-[15px] leading-relaxed text-ink/70">{s.v}</p>
-                  <div aria-hidden className="mt-6 rounded-lg bg-paper/70 p-4 ring-1 ring-ink/5 md:mt-auto">
-                    <StepPreview step={i} product={lookProducts[0] ?? catalog[0]} />
-                  </div>
-                </li>
-              ))}
-            </ol>
-            <button type="button" onClick={() => goCatalog({ all: true })} className="btn-primary mt-8 w-full sm:w-auto">
-              Empezar: ver todo el catálogo
-            </button>
-          </div>
-        </section>
-
-        {/* ───────── LA TIENDA ───────── */}
-        <section id="tienda" className="mx-auto max-w-[1400px] scroll-mt-20 px-4 py-16 sm:px-8 sm:py-24">
-          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-16">
-            <div data-reveal className="relative order-2 lg:order-1">
-              <img src="/img/fachada.jpeg" alt="Fachada de Viper Store de noche" loading="lazy" className="aspect-square w-full rounded-2xl object-cover object-bottom shadow-lift ring-1 ring-white/10" />
-              <span className="sticker absolute -top-4 right-6 rotate-[5deg] bg-primary text-white">Ven a verla ☺</span>
-            </div>
-            <div className="order-1 lg:order-2">
-              <h2 data-reveal className="font-display text-[clamp(3rem,8vw,6rem)] uppercase leading-[0.85]">
-                Una vitrina que no pasa desapercibida
-              </h2>
-              <p className="mt-6 max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg">¿Dudas de talla o disponibilidad? Escríbenos y te respondemos por WhatsApp.</p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <a href={WA_CHAT} target="_blank" rel="noopener" className="btn-primary">
-                  <MessageCircle className="size-4" /> Escribir por WhatsApp
-                </a>
-                {INSTAGRAM_URL && (
-                  <a href={INSTAGRAM_URL} target="_blank" rel="noopener" className="btn-ghost">
-                    <Instagram className="size-4" /> Seguir en Instagram
-                  </a>
-                )}
+                <button
+                  type="submit"
+                  className="vs-press h-[52px] w-full border-0 bg-[#2E8BFF] px-7 text-[15px] font-bold text-[#0B0D10] sm:w-auto"
+                >
+                  Quiero entrar
+                </button>
               </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* ───────── PIE ───────── */}
-      <footer className="relative overflow-hidden border-t border-border bg-surface">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-8 px-4 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div>
-            <Logo size="lg" />
-            <p className="mt-3 text-sm text-muted-foreground">Good vibes only · Local support local</p>
-          </div>
-          <nav className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground" aria-label="Pie">
-            <a href="#lookbook" className="hover:text-foreground">Lookbook</a>
-            <a href="#catalogo" className="hover:text-foreground">Catálogo</a>
-            <a href="#como-comprar" className="hover:text-foreground">Cómo comprar</a>
-            <a href="#/admin" className="hover:text-foreground">Admin</a>
-          </nav>
-          <a href={WA_CHAT} target="_blank" rel="noopener" aria-label="WhatsApp" className="grid size-11 place-items-center rounded-full border border-border transition-colors hover:border-primary hover:text-primary-glow">
-            <MessageCircle className="size-5" />
-          </a>
+              {dropError && <span className="text-[12px] text-[#FFB4A8]">{dropError}</span>}
+            </form>
+          )}
         </div>
-        <p aria-hidden className="select-none whitespace-nowrap text-center font-display text-[26vw] uppercase leading-[0.8] text-primary">
-          Viper
-        </p>
-        <p className="label border-t border-border py-5 text-center text-muted-foreground">© 2026 Viper Store</p>
+      </section>
+
+      {/* ───────── Footer con marca de agua gigante ───────── */}
+      <footer className={`mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24 ${showMobileBar ? "pb-28 sm:pb-12" : "pb-12"}`}>
+        <div className="flex flex-wrap items-end gap-x-5 gap-y-2 sm:gap-x-7">
+          <div className="font-display text-[72px] leading-[0.86] tracking-[0.02em] text-[#1A1E24] sm:text-[116px] lg:text-[152px]">
+            VIPER
+          </div>
+          <div className="font-marker -rotate-[4deg] pb-1 text-[34px] leading-none text-[#1A4FA0] sm:pb-2 sm:text-[52px] lg:text-[68px]">
+            Store
+          </div>
+        </div>
+
+        <div className="mt-7 flex flex-wrap items-center justify-between gap-6 border-t border-[#2A313B] pt-6 text-[13px] text-[#8A94A3] sm:text-[14px]">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <button
+              type="button"
+              onClick={() => setInfoModal("shipping")}
+              className="border-0 bg-transparent p-0 text-[13px] text-[#8A94A3] hover:text-[#F2F4F7] sm:text-[14px]"
+            >
+              Envíos
+            </button>
+            <button
+              type="button"
+              onClick={() => setInfoModal("returns")}
+              className="border-0 bg-transparent p-0 text-[13px] text-[#8A94A3] hover:text-[#F2F4F7] sm:text-[14px]"
+            >
+              Cambios y devoluciones
+            </button>
+            <button
+              type="button"
+              onClick={() => setInfoModal("sizes")}
+              className="border-0 bg-transparent p-0 text-[13px] text-[#8A94A3] hover:text-[#F2F4F7] sm:text-[14px]"
+            >
+              Guía de tallas
+            </button>
+            <a href={waDirect} target="_blank" rel="noopener noreferrer" className="text-[#8A94A3] no-underline hover:text-[#F2F4F7]">
+              Contacto ({WHATSAPP_DISPLAY})
+            </a>
+            <a href="#/admin" className="text-[#8A94A3] no-underline hover:text-[#2E8BFF]">
+              Panel
+            </a>
+          </div>
+          <div className="flex items-center gap-6">
+            {INSTAGRAM_URL && (
+              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className="text-[#8A94A3] no-underline hover:text-[#F2F4F7]">
+                Instagram
+              </a>
+            )}
+            {TIKTOK_URL && (
+              <a href={TIKTOK_URL} target="_blank" rel="noopener noreferrer" className="text-[#8A94A3] no-underline hover:text-[#F2F4F7]">
+                TikTok
+              </a>
+            )}
+          </div>
+        </div>
       </footer>
 
-      <ProductDrawer product={product} onClose={closeProduct} onOpenCart={openCart} />
-      <CartDrawer open={cartOpen} onClose={closeCart} />
-      <Toaster />
+      {/* ───────── Barra inferior flotante en móvil cuando hay items ───────── */}
+      {showMobileBar && (
+        <div className="fixed right-3 bottom-[max(14px,env(safe-area-inset-bottom))] left-3 z-30 md:hidden">
+          <button
+            type="button"
+            onClick={() => {
+              setToast(null)
+              setStage("cart")
+            }}
+            className="vs-press flex h-[56px] w-full items-center justify-between border-0 bg-[#F2F4F7] pr-2 pl-[18px] text-[14px] font-bold text-[#0B0D10]"
+            style={{ boxShadow: "0 12px 32px rgba(0,0,0,0.6)" }}
+          >
+            <span>
+              {count} {count === 1 ? "prenda" : "prendas"} en tu carrito
+            </span>
+            <span className="flex h-10 items-center bg-[#2E8BFF] px-3.5 text-[#0B0D10]">Ver carrito</span>
+          </button>
+        </div>
+      )}
+
+      {/* ───────── Bolsitas voladoras hacia el carrito ───────── */}
+      {flyers.map((fl) => (
+        <div
+          key={fl.id}
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            zIndex: 65,
+            pointerEvents: "none",
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "#2E8BFF",
+            color: "#0B0D10",
+            boxShadow: "0 10px 28px rgba(0,0,0,.55), 0 0 0 4px rgba(11,13,16,.9)",
+            transition:
+              "left .68s cubic-bezier(.55,0,.85,.45), top .68s cubic-bezier(.15,.6,.35,1), transform .68s ease-in, opacity .68s ease-in",
+            left: (fl.go ? fl.tx : fl.x) - 22,
+            top: (fl.go ? fl.ty : fl.y) - 22,
+            transform: fl.go ? "scale(.35) rotate(-20deg)" : "scale(1.1)",
+            opacity: fl.go ? 0.5 : 1,
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round">
+            <path d="M5 8h14l-1 12H6L5 8z" />
+            <path d="M9 8V6a3 3 0 016 0v2" />
+          </svg>
+        </div>
+      ))}
+
+      {/* ───────── Toast de agregado al carrito ───────── */}
+      {toast && stage === "off" && (
+        <div
+          role="status"
+          className="vs-toast fixed bottom-[82px] left-1/2 z-[70] flex max-w-[calc(100%-24px)] -translate-x-1/2 items-center gap-3.5 bg-[#E8EAED] py-2.5 pr-2.5 pl-4 text-[13px] font-semibold text-[#0B0D10] sm:bottom-7 sm:gap-4 sm:text-[14px]"
+          style={{ boxShadow: "0 16px 40px rgba(0,0,0,0.55)" }}
+        >
+          <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#1E3A5F] text-[#E8EAED]">
+            <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12l5 5 9-10" />
+            </svg>
+          </span>
+          <span className="truncate">{toast.text}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setToast(null)
+              setStage("cart")
+            }}
+            className="vs-press h-10 shrink-0 border-0 bg-[#0B0D10] px-4 text-[13px] font-bold text-[#E8EAED]"
+          >
+            Ver carrito
+          </button>
+        </div>
+      )}
+
+      {/* ───────── Ficha de Producto ───────── */}
+      <ProductSheet
+        product={selectedProduct}
+        catalog={catalog}
+        onClose={() => setSelectedProduct(null)}
+        onAdd={triggerFlyAndAdd}
+        onOpenCart={() => setStage("cart")}
+        onOpenSizeGuide={() => setInfoModal("sizes")}
+        onSelectProduct={(p) => setSelectedProduct(p)}
+      />
+
+      {/* ───────── Flujo de Carrito + Datos + Cinemática + WhatsApp ───────── */}
+      <CheckoutFlow
+        stage={stage}
+        onStageChange={setStage}
+        onCartMutate={() => setBump((b) => b + 1)}
+      />
+
+      {/* ───────── Modales de Info (Guía de tallas, Envíos, Cambios) ───────── */}
+      <InfoModal type={infoModal} onClose={() => setInfoModal(null)} />
     </div>
   )
 }

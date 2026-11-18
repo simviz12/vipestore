@@ -1,407 +1,454 @@
 @import "tailwindcss";
 
 @theme {
-  --color-background: #0a0b0d;
-  --color-surface: #101216;
-  --color-foreground: #f3f4f6;
-  --color-muted: #181b20;
-  --color-muted-foreground: #939aa6;
-  --color-border: #272b33;
-  /* #2a63f0: blanco encima da 5,1:1 (AA). Hover más oscuro, nunca más claro. */
-  --color-primary: #2a63f0;
-  --color-primary-hover: #2358e0;
-  --color-primary-glow: #86a8ff;
-  --color-whatsapp: #0e7a3c;
-  --color-whatsapp-hover: #0b6b34;
-  --color-paper: #e8eaee;
-  --color-ink: #0a0b0d;
-  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Bricolage Grotesque", "Manrope", sans-serif;
-  --font-tag: "Permanent Marker", cursive;
-  --spacing-13: 3.25rem;
-  /* Dos niveles de sombra, neutras. El azul queda para acciones y el logo. */
-  --shadow-soft: 0 1px 2px rgb(0 0 0 / 0.3), 0 12px 28px -16px rgb(0 0 0 / 0.6);
-  --shadow-lift: 0 2px 4px rgb(0 0 0 / 0.3), 0 36px 80px -32px rgb(0 0 0 / 0.85);
-  /* Esquinas: 8px (lg) controles pequeños, 16px (2xl) tarjetas y paneles, y píldoras. */
-}
-
-.font-display,
-.look-name,
-.vs-look .rwl-title {
-  font-weight: 800;
-  font-stretch: 75%;
-  font-variation-settings: "opsz" 96;
-  letter-spacing: -0.015em;
-}
-.label {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  --color-background: #0B0D10;
+  --color-surface: #1A1E24;
+  --color-surface-elevated: #222833;
+  --color-foreground: #F2F4F7;
+  --color-foreground-soft: #E8EAED;
+  --color-muted: #1A1E24;
+  --color-muted-foreground: #8A94A3;
+  --color-secondary-text: #C3CAD4;
+  --color-border: #2A313B;
+  --color-border-strong: #3A424E;
+  --color-accent: #2E8BFF;
+  --color-accent-deep: #1A4FA0;
+  --color-accent-navy: #1E3A5F;
+  --color-whatsapp: #25D366;
+  --color-danger: #E5484D;
+  --font-display: "Anton", sans-serif;
+  --font-marker: "Permanent Marker", cursive;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 html {
-  background: var(--color-background);
-  color: var(--color-foreground);
+  background: #0B0D10;
+  color: #F2F4F7;
   color-scheme: dark;
   scroll-behavior: smooth;
   -webkit-tap-highlight-color: transparent;
 }
+
 body {
   margin: 0;
+  background: #0B0D10;
+  color: #E8EAED;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
+
+button,
+a,
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+button {
+  cursor: pointer;
+}
+
 ::selection {
-  background: var(--color-primary);
-  color: #fff;
+  background: #2E8BFF;
+  color: #0B0D10;
 }
+
 :focus-visible {
-  outline: 2px solid var(--color-primary-glow);
-  outline-offset: 3px;
+  outline: 2px solid #2E8BFF;
+  outline-offset: 2px;
 }
 
-/* film grain */
-.grain::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  pointer-events: none;
-  opacity: 0.05;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+/* Scrollbar invisible para carruseles horizontales */
+.vs-scroll::-webkit-scrollbar {
+  display: none;
+}
+.vs-scroll {
+  scrollbar-width: none;
 }
 
-@layer components {
-/* buttons */
-.btn-primary,
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  min-height: 3.25rem;
-  padding: 0 1.75rem;
-  border-radius: 999px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    transform 0.15s ease;
+/* ───────── Marquee superior ───────── */
+.vs-marquee {
+  display: flex;
+  width: max-content;
+  animation: vs-scroll 28s linear infinite;
 }
-.btn-primary {
-  background: var(--color-primary);
-  color: #fff;
+@media (max-width: 767px) {
+  .vs-marquee {
+    animation-duration: 22s;
+  }
 }
-.btn-primary:hover {
-  background: var(--color-primary-hover);
-}
-.btn-whatsapp {
-  background: var(--color-whatsapp);
-}
-.btn-whatsapp:hover {
-  background: var(--color-whatsapp-hover);
-}
-.btn-ghost {
-  border: 1px solid var(--color-border);
-}
-.btn-ghost:hover {
-  border-color: color-mix(in oklab, var(--color-foreground) 50%, transparent);
-}
-.btn-primary:active,
-.btn-ghost:active {
-  transform: scale(0.97);
-}
-}
-
-.sticker {
-  z-index: 2;
-  padding: 0.45rem 0.9rem;
-  border-radius: 0.5rem;
-  font-family: var(--font-tag);
-  font-size: clamp(0.9rem, 2.4vw, 1.15rem);
-  white-space: nowrap;
-  box-shadow: 0 12px 30px -10px rgb(0 0 0 / 0.7);
-}
-
-.outline-text {
-  color: transparent;
-  -webkit-text-stroke: 1.5px var(--color-foreground);
-}
-
-/* entrance + reveal */
-@keyframes rise {
+@keyframes vs-scroll {
   from {
-    opacity: 0;
-    transform: translateY(28px);
+    transform: translateX(0);
   }
-}
-.hero-in {
-  animation: rise 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  animation-delay: var(--d, 0ms);
-}
-@keyframes draw {
-  from {
-    stroke-dashoffset: 320;
-  }
-}
-.draw {
-  stroke-dasharray: 320;
-  animation: draw 1.1s 0.6s cubic-bezier(0.6, 0, 0.2, 1) both;
-}
-[data-reveal] {
-  opacity: 0;
-  transform: translateY(32px);
-  transition:
-    opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms),
-    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms);
-}
-[data-reveal][data-shown] {
-  opacity: 1;
-  transform: none;
-}
-@keyframes pop {
-  40% {
-    transform: scale(1.5);
-  }
-}
-
-@keyframes marquee {
   to {
     transform: translateX(-50%);
   }
 }
-.marquee {
-  animation: marquee 40s linear infinite;
+
+/* ───────── Tarjetas, tiles y botones ───────── */
+.vs-card {
+  transition: transform 0.25s ease;
+}
+@media (hover: hover) {
+  .vs-card:hover {
+    transform: translateY(-6px);
+  }
+  .vs-card:hover .vs-photo {
+    background-color: #222833;
+    box-shadow: inset 0 0 0 1px #3A424E;
+  }
+  .vs-tile:hover {
+    transform: translateY(-4px);
+    filter: brightness(1.15);
+  }
+  .vs-press:hover {
+    border-color: #8A94A3;
+  }
+}
+.vs-card .vs-photo {
+  transition: background-color 0.25s ease, box-shadow 0.25s ease;
+}
+.vs-tile {
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+.vs-press {
+  transition: transform 0.12s ease, background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.vs-press:active {
+  transform: scale(0.96);
+}
+
+/* ───────── Rebote del carrito ───────── */
+.vs-bump-a {
+  animation: vs-bump-a 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.vs-bump-b {
+  animation: vs-bump-b 0.45s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+@keyframes vs-bump-a {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+@keyframes vs-bump-b {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+
+/* ───────── Toast, Drawer, Sheet, Pop ───────── */
+.vs-toast {
+  animation: vs-toast-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+@keyframes vs-toast-in {
+  from {
+    transform: translate(-50%, 24px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+.vs-fade {
+  animation: vs-fade 0.25s ease;
+}
+@keyframes vs-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.vs-drawer {
+  animation: vs-drawer 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes vs-drawer {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.vs-sheet {
+  animation: vs-sheet 0.35s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes vs-sheet {
+  from { transform: translateY(100%); }
+  to { transform: none; }
+}
+.vs-item {
+  animation: vs-item 0.3s ease;
+}
+@keyframes vs-item {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.vs-pop {
+  animation: vs-pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+}
+@keyframes vs-pop {
+  from { opacity: 0; transform: translateY(16px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ───────── Hero VIPER TV (vitrina animada) ───────── */
+.vs-kb {
+  animation: vs-kb 18s ease-in-out infinite alternate;
+  transform-origin: 60% 40%;
+}
+@keyframes vs-kb {
+  from { transform: scale(1.04) translate(0, 0); }
+  to { transform: scale(1.16) translate(-2%, -1.5%); }
+}
+.vs-shot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  animation: vs-shot 13.5s linear infinite;
+  will-change: transform, opacity;
+}
+.vs-shot-2 {
+  animation-delay: 4.5s;
+}
+.vs-shot-3 {
+  animation-delay: 9s;
+}
+@keyframes vs-shot {
+  0% { opacity: 0; transform: scale(1.18) translate(2%, 1%); }
+  5% { opacity: 1; }
+  33% { opacity: 1; }
+  40% { opacity: 0; transform: scale(1.42) translate(-3%, -2%); }
+  100% { opacity: 0; transform: scale(1.42) translate(-3%, -2%); }
+}
+.vs-sweep {
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  width: 35%;
+  left: -40%;
+  background: linear-gradient(
+    100deg,
+    rgba(46, 139, 255, 0) 0%,
+    rgba(46, 139, 255, 0.22) 45%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(46, 139, 255, 0) 100%
+  );
+  transform: skewX(-12deg);
+  animation: vs-sweep 6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes vs-sweep {
+  0% { left: -40%; }
+  55% { left: 110%; }
+  100% { left: 110%; }
+}
+.vs-scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.22) 0 1px,
+    rgba(0, 0, 0, 0) 1px 3px
+  );
+  pointer-events: none;
+}
+.vs-flicker {
+  animation: vs-flicker 4.5s steps(1) infinite;
+}
+@keyframes vs-flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 0.86; }
+  94% { opacity: 1; }
+  96% { opacity: 0.9; }
+}
+.vs-live {
+  animation: vs-live 1.4s ease-in-out infinite;
+}
+@keyframes vs-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* ───────── Hotspot pulse (Arma tu outfit) ───────── */
+.vs-hotspot {
+  animation: vs-hotspot 2.2s ease-in-out infinite;
+}
+@keyframes vs-hotspot {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(46, 139, 255, 0.65); }
+  60% { box-shadow: 0 0 0 12px rgba(46, 139, 255, 0); }
+}
+
+/* ───────── Cinemática de pedido (VIPER TV · REC) ───────── */
+.cv-sky {
+  position: absolute;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  width: 200%;
+  animation: cv-pan linear infinite;
+}
+@keyframes cv-pan {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.cv-lane {
+  position: absolute;
+  left: 0;
+  width: 200%;
+  height: 4px;
+  background: repeating-linear-gradient(90deg, #4A525E 0 46px, rgba(0, 0, 0, 0) 46px 92px);
+  animation: cv-lane 0.35s linear infinite;
+}
+@keyframes cv-lane {
+  from { transform: translateX(0); }
+  to { transform: translateX(-92px); }
+}
+.cv-speed {
+  position: absolute;
+  height: 2px;
+  width: 120px;
+  background: linear-gradient(90deg, rgba(242, 244, 247, 0), rgba(242, 244, 247, 0.7));
+  animation: cv-speed 0.6s linear infinite;
+}
+@keyframes cv-speed {
+  from { transform: translateX(900px); opacity: 0; }
+  20% { opacity: 1; }
+  to { transform: translateX(-300px); opacity: 0; }
+}
+.cv-cart {
+  position: absolute;
+  left: 50%;
+  bottom: 30px;
+  margin-left: -75px;
+  animation: cv-cart 2.7s cubic-bezier(0.6, 0, 0.4, 1) both;
+}
+@keyframes cv-cart {
+  0% { transform: translateX(-520px); }
+  22% { transform: translateX(0); }
+  30% { transform: translateX(-10px); }
+  74% { transform: translateX(0); }
+  100% { transform: translateX(620px) scale(0.8); }
+}
+.cv-bob {
+  animation: cv-bob 0.28s ease-in-out infinite alternate;
+}
+@keyframes cv-bob {
+  from { transform: translateY(0); }
+  to { transform: translateY(-4px) rotate(-1deg); }
+}
+.cv-wheel {
+  animation: cv-spin 0.35s linear infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes cv-spin {
+  to { transform: rotate(360deg); }
+}
+.cv-drop {
+  animation: cv-drop 0.42s cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+@keyframes cv-drop {
+  0% { opacity: 0; transform: translateY(-140px) rotate(-18deg); }
+  25% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+.cv-flash {
+  position: absolute;
+  inset: 0;
+  background: #F2F4F7;
+  opacity: 0;
+  animation: cv-flash 2.7s linear both;
+  pointer-events: none;
+}
+@keyframes cv-flash {
+  0%, 76% { opacity: 0; }
+  80% { opacity: 0.85; }
+  100% { opacity: 0; }
+}
+.cv-wa {
+  animation: cv-wa 2.7s cubic-bezier(0.2, 0.9, 0.3, 1.3) both;
+}
+@keyframes cv-wa {
+  0%, 78% { opacity: 0; transform: scale(0.3); }
+  92% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.cv-rec {
+  animation: cv-rec 1s steps(1) infinite;
+}
+@keyframes cv-rec {
+  50% { opacity: 0; }
+}
+.cv-bar {
+  animation: cv-bar 2.7s linear both;
+}
+@keyframes cv-bar {
+  from { width: 0; }
+  to { width: 100%; }
+}
+.cv-glow {
+  text-shadow: 0 0 8px #2E8BFF, 0 0 22px #2E8BFF;
+}
+
+/* ───────── Panel Admin ───────── */
+.vp-in {
+  transition: border-color 0.2s ease;
+}
+.vp-in:focus {
+  outline: none;
+  border-color: #2E8BFF;
+}
+.vp-drop {
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+.vp-drop:hover {
+  border-color: #8A94A3;
+}
+.vp-new {
+  animation: vp-new 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+}
+@keyframes vp-new {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
-  .marquee,
-  .hero-in,
-  .draw {
+  .vs-shot,
+  .vs-sweep,
+  .vs-flicker,
+  .vs-pop,
+  .vs-kb,
+  .vs-live,
+  .vs-marquee,
+  .vs-bump-a,
+  .vs-bump-b,
+  .vs-toast,
+  .vs-drawer,
+  .vs-sheet,
+  .vs-item,
+  .vs-fade,
+  .vs-hotspot,
+  .cv-sky,
+  .cv-lane,
+  .cv-speed,
+  .cv-bob,
+  .cv-wheel,
+  .cv-rec,
+  .vp-new {
     animation: none;
   }
-  [data-reveal] {
-    opacity: 1;
+  .vs-shot {
+    opacity: 0;
+  }
+  .vs-card:hover,
+  .vs-tile:hover {
     transform: none;
-    transition: none;
-  }
-}
-
-/* ───── Lookbook street: la prenda del frente a color, la fila en B/N ───── */
-.vs-look .rwl-head,
-.vs-look .rwl-nav {
-  display: none;
-}
-.vs-look .rwl-pin {
-  padding-top: 64px;
-  box-sizing: border-box;
-}
-@media (min-width: 640px) {
-  .vs-look .rwl-pin {
-    padding-top: 80px;
-  }
-}
-.vs-look .rwl-cap {
-  font-family: var(--font-sans);
-}
-.vs-look .rwl-stage {
-  background:
-    repeating-linear-gradient(90deg, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 88px),
-    repeating-linear-gradient(0deg, rgb(255 255 255 / 0.025) 0 1px, transparent 1px 88px),
-    linear-gradient(180deg, #0c0d10, #14171c 70%, #0c0d10);
-}
-.vs-look .rwl-fig > img {
-  border-radius: 8px;
-  filter: grayscale(1) contrast(1.1) brightness(0.8);
-  transition: filter 0.6s ease;
-  box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.85), 0 0 0 1px rgb(255 255 255 / 0.08);
-}
-.vs-look .rwl-fig[data-front] > img {
-  filter: none;
-  box-shadow: 0 40px 80px -24px rgb(0 0 0 / 0.9), 0 0 0 2px #fff;
-}
-.vs-look .rwl-blurb {
-  font-size: 13px;
-}
-.vs-look .rwl-rail {
-  background: var(--color-surface);
-  border-left: 1px solid var(--color-border);
-}
-.vs-look .rwl-card[data-tint] {
-  background: var(--color-muted);
-}
-.vs-look .rwl-pic {
-  margin: 6px 8% 12px;
-  border-radius: 8px;
-}
-.vs-look .rwl-pname {
-  font-size: 12px;
-}
-.vs-look .rwl-price {
-  font-size: 12px;
-  color: var(--color-primary-glow);
-}
-.vs-look .rwl-title {
-  font-family: var(--font-display);
-  font-size: clamp(30px, 3.6vw, 56px);
-  letter-spacing: 0.01em;
-  line-height: 0.9;
-}
-.vs-look .rwl-look {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: var(--color-primary-glow);
-  align-items: center;
-}
-.look-cap {
-  margin-top: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-width: min(70vw, 420px);
-}
-.look-name {
-  font-family: var(--font-display);
-  text-transform: uppercase;
-  font-size: clamp(34px, 4.6vw, 72px);
-  line-height: 0.88;
-  text-shadow: 0 2px 24px rgb(0 0 0 / 0.8);
-}
-.look-price {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  font-size: 15px;
-  color: var(--color-foreground);
-}
-.vs-look .rwl-shop {
-  margin-top: 16px;
-  min-height: 44px;
-  padding: 14px 22px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--color-primary);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  transition: background-color 0.2s ease, transform 0.15s ease;
-}
-.vs-look .rwl-shop:hover {
-  background: var(--color-primary-hover);
-}
-.vs-look .rwl-shop:active {
-  transform: scale(0.97);
-}
-.vs-look[data-narrow] .rwl-blurb {
-  display: none;
-}
-.vs-look[data-narrow] .rwl-copy {
-  max-width: 80%;
-}
-
-/* ───── Tienda: formularios, avisos ───── */
-@layer components {
-.input {
-  display: block;
-  width: 100%;
-  height: 3.25rem;
-  padding: 0 1rem;
-  border-radius: 1rem;
-  border: 1.5px solid var(--color-border);
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-size: 16px; /* evita el zoom de iOS al enfocar */
-  outline: none;
-  transition: border-color 0.2s ease;
-}
-.input::placeholder {
-  color: color-mix(in oklab, var(--color-muted-foreground) 70%, transparent);
-}
-.input:focus {
-  border-color: var(--color-primary);
-}
-}
-button {
-  cursor: pointer;
-}
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(0.96);
-  }
-}
-.toast-in {
-  animation: toast-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-}
-.fade-in {
-  animation: fade-in 0.35s ease;
-}
-
-/* Lookbook en celular: foto arriba, nombre y botón abajo, sin encimarse */
-.vs-look[data-narrow] .rwl-copy {
-  top: 12px;
-  max-width: none;
-}
-.vs-look[data-narrow] .rwl-title {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  color: var(--color-muted-foreground);
-  margin: 0;
-}
-.vs-look[data-narrow] .rwl-foot {
-  left: 16px;
-  right: 16px;
-  bottom: 16px;
-}
-.vs-look[data-narrow] .look-cap {
-  max-width: none;
-  flex-direction: row;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-.vs-look[data-narrow] .look-name {
-  font-size: 30px;
-}
-.vs-look[data-narrow] .look-price {
-  flex: none;
-  padding-bottom: 2px;
-  color: var(--color-primary-glow);
-}
-.vs-look[data-narrow] .rwl-shop {
-  display: block;
-  width: 100%;
-  margin-top: 12px;
-  padding: 16px;
-  font-size: 12px;
-}
-
-[role="dialog"] {
-  box-shadow: var(--shadow-lift);
-}
-@media (min-width: 640px) {
-  .vs-look[data-narrow] .rwl-foot {
-    right: max(16px, calc(100% - 560px));
-    left: 32px;
-  }
-  .vs-look[data-narrow] .rwl-copy {
-    left: 32px;
   }
 }
