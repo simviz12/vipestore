@@ -17,7 +17,7 @@ import { Logo } from "@/components/site/logo"
 const ALL_SIZES = ["XS", "S", "M", "L", "XL", "ÚNICA"] as const
 const TAG_OPTIONS = [
   { value: "NUEVO", label: "Nuevo" },
-  { value: "DROP 04", label: "Drop 04" },
+  { value: "EXCLUSIVO", label: "Exclusivo" },
   { value: "ÚLTIMAS", label: "Últimas unidades" },
   { value: "BÁSICO", label: "Básico" },
 ]

@@ -57,13 +57,13 @@ export function inferCategory(p: Product): Category {
 const u = (id: string) => `https://images.unsplash.com/photo-${id}?w=800&h=1000&fit=crop&q=80`
 const makeSizes = (...labels: string[]): SizeOption[] => labels.map((label) => ({ label }))
 
-/** Catálogo Drop 04 "Nocturno". Se edita y reemplaza desde /admin. */
+/** Catálogo Viper Store. Se edita y reemplaza desde /admin. */
 export const SEED: Product[] = [
   {
     id: "hoodie-asfalto",
     name: "Hoodie Asfalto",
     price: 189000,
-    tag: "DROP 04",
+    tag: "NUEVO",
     category: "Hoodies",
     description: "Algodón pesado 420 g · Corte oversize con capota estructurada.",
     sizes: makeSizes("XS", "S", "M", "L", "XL"),
@@ -138,7 +138,7 @@ export const SEED: Product[] = [
     id: "chaqueta-acero",
     name: "Chaqueta Acero",
     price: 249000,
-    tag: "DROP 04",
+    tag: "EXCLUSIVO",
     category: "Hoodies",
     description: "Cierres metálicos · Corte boxy resistente al viento nocturno.",
     sizes: [{ label: "XS" }, { label: "S" }, { label: "M" }, { label: "L" }, { label: "XL", soldOut: true }],

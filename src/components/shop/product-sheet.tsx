@@ -202,7 +202,7 @@ export function ProductSheet({
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="inline-block bg-[#2E8BFF] px-2 py-1 font-mono text-[11px] font-medium tracking-[0.15em] text-[#0B0D10]">
-                  {soldOut ? "AGOTADO" : `${product.tag || "DROP 04"} · QUEDAN POCAS`}
+                  {soldOut ? "AGOTADO" : `${product.tag || "ORIGINAL"} · QUEDAN POCAS`}
                 </span>
                 <button
                   type="button"

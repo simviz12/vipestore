@@ -10,10 +10,8 @@ import { BRAND_FACHADA_IMG, BRAND_LOGO_IMG, CATEGORY_IMAGES } from "@/lib/assets
 import { syncCatalog } from "@/lib/api"
 import {
   addToCart,
-  buildDropListWhatsAppUrl,
   cartCount,
   CATEGORIES,
-  dropListStore,
   formatCOP,
   inferCategory,
   isSoldOut,
@@ -41,39 +39,7 @@ const CATEGORY_TILES: { num: string; label: string; cat: Category; img: string; 
   { num: "04", label: "ACCESORIOS", cat: "Accesorios", img: CATEGORY_IMAGES.Accesorios, accent: "#2A313B" },
 ]
 
-const STREET_GALLERY = [
-  { handle: "@santi.street", bg: "#1A1E24", img: "https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=500&h=640&fit=crop&q=80" },
-  { handle: "@valen.drip", bg: "#1E3A5F", img: "https://images.unsplash.com/photo-1523398002811-999ca8dec234?w=500&h=640&fit=crop&q=80" },
-  { handle: "@mateo.med", bg: "#2A313B", img: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=500&h=640&fit=crop&q=80" },
-  { handle: "@cami.urban", bg: "#1A1E24", img: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&h=640&fit=crop&q=80" },
-  { handle: "@juan.kicks", bg: "#2A313B", img: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=500&h=640&fit=crop&q=80" },
-  { handle: "@viper.store", bg: "#1E3A5F", img: BRAND_FACHADA_IMG },
-]
-
-const LOOKBOOK_BG = "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=900&h=1100&fit=crop&q=80"
-
 const norm = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-
-/** Calcula cuánto falta para el próximo viernes a las 8:00 PM */
-function getNextDropCountdown() {
-  const now = new Date()
-  const target = new Date(now)
-  const day = now.getDay() // 5 = viernes
-  let daysUntilFriday = (5 - day + 7) % 7
-  if (daysUntilFriday === 0 && now.getHours() >= 20) daysUntilFriday = 7
-  target.setDate(now.getDate() + daysUntilFriday)
-  target.setHours(20, 0, 0, 0)
-  const diff = Math.max(0, target.getTime() - now.getTime())
-  const d = Math.floor(diff / 86_400_000)
-  const h = Math.floor((diff % 86_400_000) / 3_600_000)
-  const m = Math.floor((diff % 3_600_000) / 60_000)
-  const s = Math.floor((diff % 60_000) / 1000)
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return {
-    full: `${pad(d)} : ${pad(h)} : ${pad(m)} : ${pad(s)}`,
-    compact: `${pad(d)}:${pad(h)}:${pad(m)}`,
-  }
-}
 
 export default function App() {
   const catalog = useCatalog()
@@ -97,24 +63,8 @@ export default function App() {
   const cartBtnRef = useRef<HTMLButtonElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
 
-  // Countdown en vivo
-  const [countdown, setCountdown] = useState(getNextDropCountdown)
-
-  // Lookbook hotspot activo
-  const [activeHotspot, setActiveHotspot] = useState<number>(0)
-
-  // Lista VIP del drop
-  const [dropContact, setDropContact] = useState("")
-  const [dropJoined, setDropJoined] = useState<string | null>(null)
-  const [dropError, setDropError] = useState("")
-
   useEffect(() => {
     syncCatalog()
-  }, [])
-
-  useEffect(() => {
-    const id = window.setInterval(() => setCountdown(getNextDropCountdown()), 1000)
-    return () => window.clearInterval(id)
   }, [])
 
   useEffect(() => {
@@ -211,57 +161,14 @@ export default function App() {
     })
   }, [catalog, filter, query])
 
-  // 3 prendas para el lookbook interactivo "Arma tu outfit"
-  const outfitPieces = useMemo(() => {
-    const hoodie = catalog.find((p) => inferCategory(p) === "Hoodies" && !isSoldOut(p)) ?? catalog[0]
-    const cargo = catalog.find((p) => inferCategory(p) === "Cargos" && !isSoldOut(p)) ?? catalog[1] ?? catalog[0]
-    const acc = catalog.find((p) => inferCategory(p) === "Accesorios" && !isSoldOut(p)) ?? catalog[2] ?? catalog[0]
-    return [
-      { product: hoodie, left: "44%", top: "24%", label: "Parte superior" },
-      { product: cargo, left: "56%", top: "52%", label: "Pantalón" },
-      { product: acc, left: "34%", top: "64%", label: "Accesorio" },
-    ].filter((x) => Boolean(x.product))
-  }, [catalog])
-
   const jumpToCategory = (cat: FilterOption) => {
     setFilter(cat)
     document.getElementById("tienda")?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const handleAddFullOutfit = () => {
-    outfitPieces.forEach(({ product }) => {
-      if (!product || isSoldOut(product)) return
-      const c = product.colors.find((x) => !x.soldOut) ?? product.colors[0]
-      const s =
-        product.sizes.find((x) => !x.soldOut && x.label === "M")?.label ??
-        product.sizes.find((x) => !x.soldOut)?.label ??
-        "M"
-      addToCart(product, c, s, 1)
-    })
-    setBump((b) => b + 1)
-    const id = ++seqRef.current
-    setToast({ id, text: `Look completo (${outfitPieces.length} prendas) agregado` })
-    schedule(() => {
-      setToast((prev) => (prev && prev.id === id ? null : prev))
-    }, 3400)
-  }
-
-  const handleDropSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const clean = dropContact.trim()
-    if (clean.length < 5) {
-      setDropError("Escribe tu correo o número de WhatsApp.")
-      return
-    }
-    setDropError("")
-    dropListStore.set((list) => (list.includes(clean) ? list : [clean, ...list]))
-    setDropJoined(clean)
-    setDropContact("")
-  }
-
   const bumpClass = bump === 0 ? "" : bump % 2 ? "vs-bump-a" : "vs-bump-b"
   const showMobileBar = count > 0 && stage === "off" && !selectedProduct && !infoModal
-  const waDirect = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hola Viper Store, quiero info sobre las prendas del Drop 04.")}`
+  const waDirect = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent("Hola Viper Store, quiero más información sobre las prendas disponibles.")}`
 
   return (
     <div className="min-h-[100dvh] w-full bg-[#0B0D10] font-sans text-[#E8EAED]">
@@ -270,7 +177,7 @@ export default function App() {
         <div className="vs-marquee">
           {[0, 1, 2, 3].map((k) => (
             <span key={k} className="pr-10 sm:pr-12">
-              ROPA TAN CHIMBA QUE NO SE REPITE ✦ DROP 04 CAE ESTE VIERNES 8 PM · SIN RESTOCK ✦ ENVÍO GRATIS DESDE {formatCOP(FREE_SHIPPING_FROM)} ✦ PEDIDOS POR WHATSAPP {WHATSAPP_DISPLAY} ✦ LOCAL SUPPORT LOCAL ✦
+              ROPA TAN CHIMBA QUE NO SE REPITE ✦ ENVÍO GRATIS DESDE {formatCOP(FREE_SHIPPING_FROM)} ✦ PEDIDOS POR WHATSAPP {WHATSAPP_DISPLAY} ✦ LOCAL SUPPORT LOCAL ✦ MEDELLÍN · ENVÍOS A TODA COLOMBIA ✦
             </span>
           ))}
         </div>
@@ -279,13 +186,13 @@ export default function App() {
       {/* ───────── Header Sticky ───────── */}
       <header className="sticky top-0 z-40 border-b border-[#2A313B] bg-[#0B0D10]/95 backdrop-blur-sm">
         <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-4 px-4 py-3 sm:px-6 sm:py-3.5">
-          <a href="#drop" aria-label="Viper Store, inicio" className="shrink-0 no-underline">
+          <a href="#inicio" aria-label="Viper Store, inicio" className="shrink-0 no-underline">
             <Logo />
           </a>
 
           <nav className="hidden items-center gap-6 text-[14px] font-medium xl:gap-8 xl:text-[15px] lg:flex">
-            <a href="#drop" className="whitespace-nowrap text-[#E8EAED] transition-colors hover:text-[#2E8BFF]">
-              Drop
+            <a href="#tienda" className="whitespace-nowrap text-[#E8EAED] transition-colors hover:text-[#2E8BFF]">
+              Catálogo
             </a>
             <button
               type="button"
@@ -315,9 +222,6 @@ export default function App() {
             >
               Accesorios
             </button>
-            <a href="#outfit" className="whitespace-nowrap text-[#E8EAED] transition-colors hover:text-[#2E8BFF]">
-              Arma tu outfit
-            </a>
           </nav>
 
           <div className="flex shrink-0 items-center gap-2.5">
@@ -408,14 +312,14 @@ export default function App() {
 
       {/* ───────── Hero Principal (Vitrina limpia sin ícono VIPER TV) ───────── */}
       <section
-        id="drop"
-        className="relative flex min-h-[540px] items-end overflow-hidden border-b border-[#2A313B] md:min-h-[620px] lg:min-h-[660px]"
+        id="inicio"
+        className="relative flex min-h-[520px] items-end overflow-hidden border-b border-[#2A313B] md:min-h-[580px] lg:min-h-[620px]"
       >
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
           <img
             className="vs-kb absolute inset-0 h-full w-full object-cover"
             src={BRAND_FACHADA_IMG}
-            alt=""
+            alt="Fachada Viper Store"
             style={{ objectPosition: "center 42%" }}
           />
           <div className="vs-sweep" />
@@ -446,9 +350,10 @@ export default function App() {
 
         {/* Contenido Hero con espaciado respirable */}
         <div className="relative z-10 mx-auto flex w-full max-w-[1280px] flex-wrap items-end justify-between gap-8 px-4 pt-16 pb-8 sm:px-6 md:py-16 lg:py-20">
-          <div className="flex min-w-0 flex-[999_1_520px] flex-col gap-5 md:gap-6">
-            <div className="font-mono text-[11px] tracking-[0.2em] text-[#C3CAD4] md:text-[13px]">
-              VIPER STORE · DROP 04 &ldquo;NOCTURNO&rdquo;
+          <div className="flex min-w-0 max-w-[720px] flex-col gap-5 md:gap-6">
+            <div className="inline-flex w-fit items-center gap-2 border border-[#2E8BFF]/40 bg-[#0B0D10]/80 px-3 py-1.5 font-mono text-[11px] font-medium tracking-[0.16em] text-[#F2F4F7] backdrop-blur-sm">
+              <span className="h-2 w-2 rounded-full bg-[#2E8BFF] animate-pulse" />
+              VIPER STORE · STREETWEAR COLOMBIANO
             </div>
 
             <h1 className="m-0 font-display text-[54px] font-normal leading-[0.98] tracking-[0.01em] text-[#F2F4F7] sm:text-[78px] lg:text-[106px]">
@@ -459,41 +364,27 @@ export default function App() {
               <span className="block">QUE NO SE REPITE.</span>
             </h1>
 
-            <p className="m-0 max-w-[460px] text-[15px] leading-[1.6] text-[#D5DAE1] sm:text-[17px]">
+            <p className="m-0 max-w-[500px] text-[15px] leading-[1.6] text-[#D5DAE1] sm:text-[17px]">
               Hoodies pesados, cargos y camisetas en negro, blanco y azul eléctrico. Piezas limitadas, hechas pa&apos; la calle.
             </p>
 
             {/* CTAs */}
-            <div className="mt-1 flex flex-wrap items-stretch gap-3">
+            <div className="mt-2 flex flex-wrap items-center gap-3">
               <a
                 href="#tienda"
-                className="vs-press inline-flex h-[52px] flex-1 items-center justify-center bg-[#2E8BFF] px-7 text-[14px] font-bold tracking-[0.04em] text-[#0B0D10] no-underline sm:flex-none sm:text-[15px]"
+                className="vs-press inline-flex h-[52px] items-center justify-center bg-[#2E8BFF] px-8 text-[15px] font-bold tracking-[0.04em] text-[#0B0D10] no-underline shadow-[0_4px_24px_rgba(46,139,255,0.35)]"
               >
-                COMPRAR EL DROP
+                VER CATÁLOGO
               </a>
               <a
-                href="#outfit"
-                className="vs-press hidden h-[52px] items-center justify-center border border-[#F2F4F7] bg-[rgba(11,13,16,0.45)] px-7 text-[15px] font-semibold text-[#F2F4F7] no-underline sm:inline-flex"
+                href={waDirect}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="vs-press inline-flex h-[52px] items-center justify-center border border-[#3A424E] bg-[#1A1E24]/90 px-6 text-[14px] font-semibold text-[#F2F4F7] no-underline backdrop-blur-sm hover:border-[#25D366] hover:text-[#25D366]"
               >
-                Ver lookbook
+                WhatsApp ({WHATSAPP_DISPLAY})
               </a>
-              {/* Contador compacto en móvil */}
-              <div className="flex h-[52px] flex-col justify-center border border-[#3A424E] bg-[rgba(11,13,16,0.72)] px-3.5 md:hidden">
-                <span className="font-mono text-[9px] tracking-[0.14em] text-[#8A94A3]">CAE EN</span>
-                <span className="mt-0.5 font-display text-[18px] leading-none text-[#F2F4F7] tabular-nums">
-                  {countdown.compact}
-                </span>
-              </div>
             </div>
-          </div>
-
-          {/* Contador desktop */}
-          <div className="hidden max-w-[360px] flex-[1_1_280px] flex-col gap-2 border border-[#2A313B] bg-[rgba(11,13,16,0.88)] px-6 py-5 backdrop-blur-sm md:flex">
-            <div className="font-mono text-[11px] tracking-[0.18em] text-[#8A94A3]">EL DROP CAE EN</div>
-            <div className="font-display text-[40px] leading-none tracking-[0.05em] text-[#F2F4F7] tabular-nums">
-              {countdown.full}
-            </div>
-            <div className="font-mono text-[11px] tracking-[0.16em] text-[#8A94A3]">DÍAS · HORAS · MIN · SEG</div>
           </div>
         </div>
       </section>
@@ -683,269 +574,6 @@ export default function App() {
             })}
           </div>
         )}
-      </section>
-
-      {/* ───────── ARMA TU OUTFIT (Lookbook interactivo con hotspots) ───────── */}
-      <section id="outfit" className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
-        <div className="grid grid-cols-1 overflow-hidden border border-[#2A313B] bg-[#1A1E24] lg:grid-cols-2">
-          <div className="flex flex-col justify-center gap-5 p-6 sm:p-10 lg:p-14">
-            <div className="font-mono text-[12px] tracking-[0.2em] text-[#8A94A3]">ARMA TU OUTFIT</div>
-            <h2 className="m-0 font-display text-[40px] font-normal leading-[1.02] text-[#F2F4F7] sm:text-[52px]">
-              EL LOOK COMPLETO,
-              <br />
-              EN UN CLIC.
-            </h2>
-            <p className="m-0 max-w-[440px] text-[15px] leading-[1.6] text-[#B8BFCA] sm:text-[16px]">
-              Cada foto del lookbook tiene puntos sobre las prendas. Toca un punto, revisa la prenda o agrega todo el outfit junto.
-            </p>
-            <div className="mt-2 flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={handleAddFullOutfit}
-                className="vs-press inline-flex h-[52px] items-center border-0 bg-[#E8EAED] px-7 text-[14px] font-bold text-[#0B0D10] sm:text-[15px]"
-              >
-                Agregar look completo
-              </button>
-              {outfitPieces[activeHotspot]?.product && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedProduct(outfitPieces[activeHotspot].product)}
-                  className="vs-press inline-flex h-[52px] items-center border border-[#3A424E] bg-transparent px-6 text-[14px] font-semibold text-[#F2F4F7]"
-                >
-                  Ver {outfitPieces[activeHotspot].product.name}
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="relative min-h-[420px] overflow-hidden bg-[#2A313B] sm:min-h-[480px] lg:min-h-[520px]">
-            <img src={LOOKBOOK_BG} alt="Lookbook Viper Store" loading="lazy" className="absolute inset-0 h-full w-full object-cover object-top" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B0D10]/90 via-transparent to-[#0B0D10]/25" />
-            <span className="absolute top-5 left-5 bg-[#0B0D10]/85 px-3 py-1.5 font-mono text-[11px] tracking-[0.15em] text-[#C3CAD4]">
-              LOOK 01 · DROP 04
-            </span>
-
-            {/* 3 Hotspots interactivos posicionados sobre el área superior/media */}
-            {outfitPieces.map((spot, idx) => {
-              const active = activeHotspot === idx
-              return (
-                <button
-                  key={spot.product.id + idx}
-                  type="button"
-                  aria-label={`Ver ${spot.product.name}`}
-                  onClick={() => setActiveHotspot(idx)}
-                  className="vs-hotspot absolute -mt-3.5 -ml-3.5 flex h-7 w-7 items-center justify-center rounded-full border-[3px] border-[#0B0D10] p-0 transition-transform"
-                  style={{
-                    left: spot.left,
-                    top: spot.top,
-                    background: active ? "#F2F4F7" : "#2E8BFF",
-                    transform: active ? "scale(1.2)" : "scale(1)",
-                  }}
-                >
-                  <span className="h-2 w-2 rounded-full bg-[#0B0D10]" />
-                </button>
-              )
-            })}
-
-            {/* Tarjeta flotante de la prenda seleccionada */}
-            {outfitPieces[activeHotspot]?.product && (
-              <div className="absolute right-4 bottom-4 left-4 flex items-center justify-between gap-3 border border-[#2A313B] bg-[#0B0D10]/95 p-4 backdrop-blur-sm">
-                <div className="min-w-0">
-                  <div className="font-mono text-[10px] tracking-[0.16em] text-[#2E8BFF]">
-                    {outfitPieces[activeHotspot].label.toUpperCase()}
-                  </div>
-                  <div className="mt-0.5 truncate text-[15px] font-semibold text-[#F2F4F7]">
-                    {outfitPieces[activeHotspot].product.name}
-                  </div>
-                  <div className="mt-0.5 font-mono text-[13px] text-[#C3CAD4]">
-                    {formatCOP(outfitPieces[activeHotspot].product.price)}
-                  </div>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedProduct(outfitPieces[activeHotspot].product)}
-                    className="vs-press h-10 border border-[#3A424E] bg-transparent px-3.5 text-[12px] font-semibold text-[#F2F4F7]"
-                  >
-                    Ver
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => handleQuickAdd(outfitPieces[activeHotspot].product, e)}
-                    className="vs-press h-10 border-0 bg-[#2E8BFF] px-4 text-[12px] font-bold text-[#0B0D10]"
-                  >
-                    + Agregar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* ───────── NUESTRA VITRINA Y MARCA (usa las 2 imágenes reales de src/img) ───────── */}
-      <section className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
-        <div className="grid grid-cols-1 gap-5 border border-[#2A313B] bg-[#1A1E24] p-5 sm:p-8 lg:grid-cols-[1.15fr_1fr] lg:items-center lg:gap-10 lg:p-10">
-          <div className="grid grid-cols-[1.5fr_1fr] gap-3 sm:gap-4">
-            <div className="relative aspect-[4/5] overflow-hidden border border-[#2A313B] bg-[#0B0D10]">
-              <img
-                src={BRAND_FACHADA_IMG}
-                alt="Vitrina oficial de Viper Store"
-                loading="lazy"
-                className="h-full w-full object-cover object-center"
-              />
-            </div>
-            <div className="flex flex-col gap-3 sm:gap-4">
-              <div className="relative flex aspect-square items-center justify-center overflow-hidden border border-[#2A313B] bg-[#0B0D10]">
-                <img
-                  src={BRAND_LOGO_IMG}
-                  alt="Logo oficial Viper Store"
-                  loading="lazy"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <a
-                href={waDirect}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex flex-1 flex-col justify-between border border-[#2A313B] bg-[#0B0D10] p-4 no-underline transition-colors hover:border-[#2E8BFF]"
-              >
-                <span className="font-mono text-[10px] tracking-[0.16em] text-[#2E8BFF]">WHATSAPP DIRECTO</span>
-                <div className="my-2 text-[12px] leading-relaxed text-[#8A94A3]">
-                  Pedidos, asesoría de tallas y envíos al instante.
-                </div>
-                <span className="font-display text-[22px] leading-none text-[#F2F4F7] sm:text-[26px]">
-                  {WHATSAPP_DISPLAY}
-                </span>
-              </a>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-5">
-            <div className="font-mono text-[12px] tracking-[0.2em] text-[#8A94A3]">LA VITRINA ES LA MARCA</div>
-            <h2 className="m-0 font-display text-[38px] font-normal leading-[1.02] text-[#F2F4F7] sm:text-[48px]">
-              CALLE COLOMBIANA CON <span className="font-marker text-[#2E8BFF]">corona</span>.
-            </h2>
-            <p className="m-0 text-[15px] leading-[1.65] text-[#C3CAD4] sm:text-[16px]">
-              Eliges tus prendas, llenas tus datos en un minuto y te confirmamos pago y envío directo por WhatsApp. También puedes pasar a recoger en nuestra tienda física.
-            </p>
-            <div className="flex flex-wrap items-center gap-2.5 pt-1">
-              <span className="font-marker -rotate-[2deg] bg-[#F2F4F7] px-3 py-1.5 text-[14px] text-[#0B0D10]">
-                Good vibes only
-              </span>
-              <span className="border-2 border-[#F2F4F7] px-3 py-1.5 font-mono text-[11px] tracking-[0.15em] text-[#F2F4F7]">
-                LOCAL SUPPORT LOCAL
-              </span>
-              <span className="rotate-[2deg] bg-[#2E8BFF] px-3 py-1.5 font-mono text-[11px] font-medium tracking-[0.15em] text-[#0B0D10]">
-                DROP 04
-              </span>
-            </div>
-            <div className="pt-1">
-              <a
-                href={waDirect}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="vs-press inline-flex h-[50px] items-center justify-center bg-[#25D366] px-6 text-[14px] font-bold text-[#0B0D10] no-underline"
-              >
-                Escribir por WhatsApp ({WHATSAPP_DISPLAY})
-              </a>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ───────── #VIPERSTORE EN LA CALLE ───────── */}
-      <section className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
-        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-          <h2 className="m-0 font-display text-[36px] font-normal leading-none text-[#F2F4F7] sm:text-[52px]">
-            #VIPERSTORE EN LA CALLE
-          </h2>
-          <div className="text-[14px] text-[#B8BFCA] sm:text-[15px]">Sube tu foto con el hashtag y sale aquí.</div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-6">
-          {STREET_GALLERY.map((item) => (
-            <a
-              key={item.handle}
-              href={INSTAGRAM_URL || waDirect}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="vs-tile relative flex aspect-[4/5] items-end overflow-hidden p-3 font-mono text-[12px] text-[#E8EAED] no-underline"
-              style={{ backgroundColor: item.bg }}
-            >
-              <img src={item.img} alt={item.handle} loading="lazy" className="absolute inset-0 h-full w-full object-cover opacity-85" />
-              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0B0D10]/90 via-transparent to-transparent" />
-              <span className="relative z-10">{item.handle}</span>
-            </a>
-          ))}
-        </div>
-      </section>
-
-      {/* ───────── ENTRA A LA LISTA DEL DROP ───────── */}
-      <section className="mx-auto max-w-[1280px] px-4 pt-16 sm:px-6 sm:pt-24">
-        <div className="flex flex-wrap items-center justify-between gap-6 border border-[#2A313B] p-6 sm:p-10 lg:p-12">
-          <div className="flex max-w-[500px] flex-col gap-2.5">
-            <h2 className="m-0 font-display text-[34px] font-normal leading-none text-[#F2F4F7] sm:text-[44px]">
-              ENTRA A LA LISTA DEL DROP
-            </h2>
-            <p className="m-0 text-[15px] leading-[1.6] text-[#B8BFCA]">
-              Acceso 1 hora antes que todos y aviso por WhatsApp cuando caiga.
-            </p>
-          </div>
-
-          {dropJoined ? (
-            <div className="flex w-full flex-col gap-3 border border-[#2E8BFF]/40 bg-[#16243A] p-5 sm:w-auto sm:min-w-[380px]">
-              <div className="font-mono text-[11px] tracking-[0.15em] text-[#2E8BFF]">✓ YA ESTÁS EN LA LISTA</div>
-              <div className="text-[14px] leading-relaxed text-[#F2F4F7]">
-                Guardamos <strong>{dropJoined}</strong>. ¿Quieres confirmar por WhatsApp para recibir el aviso primero?
-              </div>
-              <div className="flex flex-wrap gap-2.5 pt-1">
-                <a
-                  href={buildDropListWhatsAppUrl(dropJoined)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="vs-press inline-flex h-11 items-center justify-center bg-[#25D366] px-4 text-[13px] font-bold text-[#0B0D10] no-underline"
-                >
-                  Confirmar por WhatsApp
-                </a>
-                <button
-                  type="button"
-                  onClick={() => setDropJoined(null)}
-                  className="vs-press h-11 border border-[#3A424E] bg-transparent px-4 text-[13px] font-semibold text-[#F2F4F7]"
-                >
-                  Otro dato
-                </button>
-              </div>
-            </div>
-          ) : (
-            <form onSubmit={handleDropSubmit} className="flex w-full flex-col gap-2 sm:w-auto">
-              <div className="flex w-full flex-wrap items-end gap-2.5 sm:w-auto">
-                <div className="flex flex-1 flex-col gap-1.5 sm:flex-none">
-                  <label htmlFor="vs-mail" className="text-[13px] text-[#B8BFCA]">
-                    Correo o WhatsApp
-                  </label>
-                  <input
-                    id="vs-mail"
-                    type="text"
-                    value={dropContact}
-                    onChange={(e) => {
-                      setDropContact(e.target.value)
-                      if (dropError) setDropError("")
-                    }}
-                    placeholder="tu@correo.com o 300..."
-                    className="vp-in h-[52px] w-full border border-[#8A94A3] bg-[#0B0D10] px-4 text-[16px] text-[#E8EAED] sm:w-[280px] sm:text-[15px]"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  className="vs-press h-[52px] w-full border-0 bg-[#2E8BFF] px-7 text-[15px] font-bold text-[#0B0D10] sm:w-auto"
-                >
-                  Quiero entrar
-                </button>
-              </div>
-              {dropError && <span className="text-[12px] text-[#FFB4A8]">{dropError}</span>}
-            </form>
-          )}
-        </div>
       </section>
 
       {/* ───────── Footer con marca de agua gigante ───────── */}
